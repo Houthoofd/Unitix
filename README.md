@@ -1,6 +1,8 @@
 # Unitix
 
 > Test stub generator for Clean Architecture projects (TypeScript / Jest / Vitest)
+>
+> Created by **[odyssee-software](https://github.com/odyssee-software)**
 
 Unitix scans your project's source files, parses them with a TypeScript AST, and scaffolds
 ready-to-run test stubs — so you spend your time writing assertions, not boilerplate.
@@ -190,4 +192,4 @@ unitix/
 
 ## License
 
-MIT © [Benoit Houthoofd](https://github.com/Houthoofd)
+MIT © [Benoit Houthoofd](https://github.com/Houthoofd) — [odyssee-software](https://github.com/odyssee-software)
