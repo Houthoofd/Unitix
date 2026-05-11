@@ -1,0 +1,39 @@
+{
+  "name": "unitix",
+  "version": "0.1.0",
+  "description": "Test stub generator for Clean Architecture projects (TypeScript / Jest / Vitest)",
+  "type": "module",
+  "main": "index.mjs",
+  "bin": {
+    "unitix": "./bin/unitix.mjs"
+  },
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "keywords": [
+    "test-generator",
+    "clean-architecture",
+    "typescript",
+    "jest",
+    "vitest",
+    "scaffold",
+    "unitix",
+    "tdd"
+  ],
+  "author": "Benoit Houthoofd",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Houthoofd/Unitix.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Houthoofd/Unitix/issues"
+  },
+  "homepage": "https://github.com/Houthoofd/Unitix#readme",
+  "dependencies": {
+    "@typescript-eslint/typescript-estree": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
