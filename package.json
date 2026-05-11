@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.mjs",
   "bin": {
-    "unitix": "./bin/unitix.mjs"
+    "unitix": "./bin/unitix"
   },
   "exports": {
     ".": "./index.mjs"
