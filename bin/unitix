@@ -27,6 +27,7 @@
 import { parseArgs, printHelp } from "../core/cli.mjs";
 import { generateTests, generateTestsAuto } from "../core/engine.mjs";
 import { detectArchitecture } from "../detectors/architecture-detector.mjs";
+import { runInit } from "../core/init.mjs";
 import { logger, setQuiet, setNoColor } from "../utils/logger.mjs";
 import { resolve } from "path";
 
@@ -40,6 +41,16 @@ if (options.noColor) setNoColor(true);
 
 if (options.help) {
   printHelp();
+  process.exit(0);
+}
+
+// ─── Mode : init ─────────────────────────────────────────────────────────────────
+
+if (options.init) {
+  await runInit(resolve(process.cwd()), {
+    noColor: options.noColor,
+    verbose: options.verbose,
+  });
   process.exit(0);
 }
 

@@ -20,6 +20,7 @@
  * @property {boolean}                    json        - Sortie JSON machine-readable (stdout propre)
  * @property {boolean}                    noColor     - Désactiver les codes ANSI
  * @property {boolean}                    sync        - Resynchroniser les stubs désynchronisés (source modifiée depuis génération)
+ * @property {boolean}                    init        - Lancer le wizard de configuration interactif
  */
 
 /** @type {Options} */
@@ -38,6 +39,7 @@ const DEFAULTS = {
   json: false,
   noColor: false,
   sync: false,
+  init: false,
 };
 
 /**
@@ -59,6 +61,12 @@ const DEFAULTS = {
 export function parseArgs(argv) {
   /** @type {Options} */
   const options = { ...DEFAULTS };
+
+  // Sous-commande positionnelle : `unitix init`
+  if (argv[0] === "init") {
+    options.init = true;
+    return options;
+  }
 
   for (const arg of argv) {
     if (arg === "--dry-run") {
@@ -91,23 +99,28 @@ export function parseArgs(argv) {
       continue;
     }
 
-    if (arg === '--ci') {
+    if (arg === "--ci") {
       options.ci = true;
       continue;
     }
 
-    if (arg === '--json') {
+    if (arg === "--json") {
       options.json = true;
       continue;
     }
 
-    if (arg === '--no-color') {
+    if (arg === "--no-color") {
       options.noColor = true;
       continue;
     }
 
-    if (arg === '--sync') {
+    if (arg === "--sync") {
       options.sync = true;
+      continue;
+    }
+
+    if (arg === "init") {
+      options.init = true;
       continue;
     }
 
@@ -169,6 +182,7 @@ export function printHelp() {
     "    npx unitix [commande] [options]",
     "",
     "  \x1b[1mCommandes :\x1b[0m",
+    "    init                                 Wizard interactif — génère unitix.config.mjs",
     "    --detect                             Analyse l'architecture du projet     \x1b[2m(aucune génération)\x1b[0m",
     "    --auto                               Détecte + génère automatiquement",
     "    --sync                               Resynchroniser les stubs désynchronisés (source modifiée)",
@@ -186,6 +200,7 @@ export function printHelp() {
     "    --help, -h                           Affiche cette aide",
     "",
     "  \x1b[1mExemples :\x1b[0m",
+    "    npx unitix init                                       # wizard de configuration",
     "    npx unitix --detect                                   # détecter l'architecture",
     "    npx unitix --auto                                     # détecter + générer",
     "    npx unitix --auto --workspace=backend --dry-run       # prévisualiser backend uniquement",

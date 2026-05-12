@@ -139,27 +139,31 @@ manuellement par le développeur.
 
 ---
 
-## 🚧 v0.5.0 — `unitix init` : assistant de configuration _(en cours)_
+## ✅ v0.5.0 — `unitix init` : assistant de configuration
 
 > _Zéro friction pour les nouveaux projets._
 
-### Problème actuel
+### Problème résolu
 
-Pour utiliser Unitix en mode config manuelle, il faut écrire `unitix.config.mjs`
+Pour utiliser Unitix en mode config manuelle, il fallait écrire `unitix.config.mjs`
 à la main. Pour les projets dont l'architecture n'est pas encore supportée en
-mode `--auto`, c'est un frein.
+mode `--auto`, c'était un frein.
 
 ### Fonctionnalités
 
-- [ ] **Commande `npx unitix init`** — wizard interactif dans le terminal :
+- [x] **Commande `npx unitix init`** — wizard interactif dans le terminal :
   1. Lance `detectArchitecture()` et affiche le profil détecté
   2. Propose des chemins auto-complétés pour `modulesDir`, `featuresDir`, etc.
   3. Demande le framework de test à utiliser (Jest / Vitest)
   4. Génère `unitix.config.mjs` prêt à l'emploi
-- [ ] **Génération des helpers de test** — si le projet n'a pas de `renderWithProviders`,
+- [x] **Génération des helpers de test** — si le projet n'a pas de `renderWithProviders`,
   propose de créer le fichier boilerplate dans `src/shared/test/`
-- [ ] **Setup MSW** — si hooks React Query détectés, propose d'installer MSW
-  et génère `src/shared/test/mocks/server.ts` + handlers de base
+- [x] **Setup MSW** — si hooks React Query détectés, propose d'installer MSW
+  et génère `src/shared/test/mocks/server.ts` + `handlers.ts` + `setup.ts`
+- [x] **Guard TTY** — détecte l'absence de terminal interactif (CI) et propose
+  une marche à suivre claire
+- [x] **Confirmation écrasement** — si `unitix.config.mjs` existe déjà,
+  demande confirmation avant d'écraser
 
 ---
 
@@ -306,4 +310,4 @@ ne peut pas personnaliser les stubs sans forker le package.
 
 ---
 
-_Dernière mise à jour : v0.4.0_
+_Dernière mise à jour : v0.5.0_
