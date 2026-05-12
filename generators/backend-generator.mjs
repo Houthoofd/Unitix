@@ -17,6 +17,7 @@ import {
   findInterfaceFile,
 } from "../parsers/interface-parser.mjs";
 import { renderBackendUseCaseTest } from "../templates/backend-use-case.mjs";
+import { loadUserTemplate } from "../utils/template-resolver.mjs";
 
 /** @import { BackendConfig, GeneratedTest } from '../types.mjs' */
 
@@ -50,11 +51,12 @@ function computeRelativePath(fromFile, toFile) {
  *     correspondante afin d'en extraire les méthodes à mocker
  *  4. Construit le contexte complet et appelle le template
  *
- * @param {string}        filePath - Chemin absolu du fichier use-case source (.ts)
- * @param {BackendConfig} config   - Configuration backend
- * @returns {Promise<GeneratedTest|null>} Contenu du test + chemin cible, ou null en cas d'échec
+ * @param {string}        filePath
+ * @param {BackendConfig} config
+ * @param {string}       [projectRoot] - Racine du projet pour la résolution des templates utilisateur
+ * @returns {Promise<GeneratedTest|null>}
  */
-export async function generateBackendTest(filePath, config) {
+export async function generateBackendTest(filePath, config, projectRoot) {
   // ── Étape 1 — Parser le use-case ──────────────────────────────────────────
   let useCaseInfo;
   try {
@@ -158,9 +160,18 @@ export async function generateBackendTest(filePath, config) {
     coverageLevel: config.coverageLevel ?? "standard",
   };
 
+  // ── Résolution du template (override utilisateur ou template interne) ────
+  let renderFn = renderBackendUseCaseTest;
+  if (projectRoot) {
+    const userRender = await loadUserTemplate("backend-use-case", projectRoot);
+    if (userRender) {
+      renderFn = userRender;
+    }
+  }
+
   let content;
   try {
-    content = renderBackendUseCaseTest(ctx);
+    content = renderFn(ctx);
   } catch (err) {
     console.warn(
       `[backend-generator] Erreur lors du rendu du template pour : ${filePath} — ${err.message}`,

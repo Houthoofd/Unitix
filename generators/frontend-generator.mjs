@@ -15,6 +15,7 @@ import { parseComponent } from "../parsers/component-parser.mjs";
 import { parseHook } from "../parsers/hook-parser.mjs";
 import { renderFrontendComponentTest } from "../templates/frontend-component.mjs";
 import { renderFrontendHookTest } from "../templates/frontend-hook.mjs";
+import { loadUserTemplate } from "../utils/template-resolver.mjs";
 
 /** @import { FrontendConfig, GeneratedTest } from '../types.mjs' */
 
@@ -83,10 +84,15 @@ function buildMswHandlerPath(testFilePath, feature, featuresDir) {
  * @param {FrontendConfig}       config   - Configuration frontend
  * @returns {Promise<GeneratedTest|null>} Contenu du test + chemin cible, ou null en cas d'échec
  */
-export async function generateFrontendTest(filePath, type, config) {
+export async function generateFrontendTest(
+  filePath,
+  type,
+  config,
+  projectRoot,
+) {
   return type === "component"
-    ? generateComponentTest(filePath, config)
-    : generateHookTest(filePath, config);
+    ? generateComponentTest(filePath, config, projectRoot)
+    : generateHookTest(filePath, config, projectRoot);
 }
 
 // ─── Stratégie composant ──────────────────────────────────────────────────────
@@ -96,7 +102,7 @@ export async function generateFrontendTest(filePath, type, config) {
  * @param {FrontendConfig} config
  * @returns {Promise<GeneratedTest|null>}
  */
-async function generateComponentTest(filePath, config) {
+async function generateComponentTest(filePath, config, projectRoot) {
   // Étape 1 — Parser le composant
   let componentInfo;
   try {
@@ -139,10 +145,20 @@ async function generateComponentTest(filePath, config) {
     coverageLevel: config.coverageLevel ?? "standard",
   };
 
+  // ── Résolution du template ─────────────────────────────────────────────
+  let renderComponentFn = renderFrontendComponentTest;
+  if (projectRoot) {
+    const userRender = await loadUserTemplate(
+      "frontend-component",
+      projectRoot,
+    );
+    if (userRender) renderComponentFn = userRender;
+  }
+
   // Étape 4 — Rendu
   let content;
   try {
-    content = renderFrontendComponentTest(ctx);
+    content = renderComponentFn(ctx);
   } catch (err) {
     console.warn(
       `[frontend-generator] Erreur rendu template composant : ${filePath} — ${err.message}`,
@@ -160,7 +176,7 @@ async function generateComponentTest(filePath, config) {
  * @param {FrontendConfig} config
  * @returns {Promise<GeneratedTest|null>}
  */
-async function generateHookTest(filePath, config) {
+async function generateHookTest(filePath, config, projectRoot) {
   // Étape 1 — Parser le hook
   let hookInfo;
   try {
@@ -210,10 +226,17 @@ async function generateHookTest(filePath, config) {
     coverageLevel: config.coverageLevel ?? "standard",
   };
 
+  // ── Résolution du template ─────────────────────────────────────────────
+  let renderHookFn = renderFrontendHookTest;
+  if (projectRoot) {
+    const userRender = await loadUserTemplate("frontend-hook", projectRoot);
+    if (userRender) renderHookFn = userRender;
+  }
+
   // Étape 5 — Rendu
   let content;
   try {
-    content = renderFrontendHookTest(ctx);
+    content = renderHookFn(ctx);
   } catch (err) {
     console.warn(
       `[frontend-generator] Erreur rendu template hook : ${filePath} — ${err.message}`,

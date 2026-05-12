@@ -76,6 +76,10 @@
  * @property {boolean}                   [force]        - Écraser les fichiers       (défaut: false)
  * @property {boolean}                   [verbose]      - Détails de parsing         (défaut: false)
  * @property {CoverageLevel}             [coverageLevel] - Niveau de couverture global (défaut: 'standard')
+ * @property {boolean}                   [sync]         - Resynchroniser les stubs désynchronisés (défaut: false)
+ * @property {boolean}                   [noCache]      - Désactiver le cache AST (défaut: false)
+ * @property {boolean}                   [watch]        - Mode watch (géré dans bin/unitix)
+ * @property {string}                    [root]         - Racine projet CLI (géré dans bin/unitix)
  */
 
 // ─── Parsers — données extraites ──────────────────────────────────────────────
@@ -228,6 +232,18 @@
  * @property {{ name: string, importPath: string }|null} renderHelper - Wrapper de rendu custom (comme FrontendComponentTemplateContext)
  * @property {string[]} [mutationPrefixes]  - Préfixes de hooks de mutation (configurable)
  * @property {string}   [sourceHash]        - Hash SHA-256 court du fichier source
+ * @property {CoverageLevel} [coverageLevel] - Niveau de couverture (défaut: 'standard')
+ */
+
+/**
+ * Contexte passé au template generic-unit
+ *
+ * @typedef {Object} GenericUnitTemplateContext
+ * @property {string}  fileName      - Nom du fichier sans extension (ex: 'UserService')
+ * @property {string}  importPath    - Import relatif depuis __tests__/ (ex: '../UserService')
+ * @property {string}  testFramework - Framework de test : 'jest' | 'vitest'
+ * @property {string} [module]       - Nom du module inféré si possible
+ * @property {string} [sourceHash]   - Hash SHA-256 court pour @unitix-source-hash
  * @property {CoverageLevel} [coverageLevel] - Niveau de couverture (défaut: 'standard')
  */
 

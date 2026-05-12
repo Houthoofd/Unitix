@@ -363,8 +363,17 @@ export async function generateTests(config) {
         // Cache miss → générer
         const generated =
           workspace === "backend"
-            ? await generateBackendTest(filePath, config.backend)
-            : await generateFrontendTest(filePath, fileType, config.frontend);
+            ? await generateBackendTest(
+                filePath,
+                config.backend,
+                config.projectRoot,
+              )
+            : await generateFrontendTest(
+                filePath,
+                fileType,
+                config.frontend,
+                config.projectRoot,
+              );
 
         if (generated) {
           setCachedGeneration(
@@ -382,8 +391,13 @@ export async function generateTests(config) {
 
     // Cache désactivé ou hash non disponible → génération directe
     return workspace === "backend"
-      ? await generateBackendTest(filePath, config.backend)
-      : await generateFrontendTest(filePath, fileType, config.frontend);
+      ? await generateBackendTest(filePath, config.backend, config.projectRoot)
+      : await generateFrontendTest(
+          filePath,
+          fileType,
+          config.frontend,
+          config.projectRoot,
+        );
   }
 
   // ════════════════════════════════════════════════════════════════════════════

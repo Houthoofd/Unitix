@@ -227,25 +227,33 @@ Bootstrapper rapidement 200 stubs = `minimal`. Travailler en TDD strict = `exhau
 
 ---
 
-## 📋 v0.7.0 — Templates personnalisables _(planifié)_
+## ✅ v0.7.0 — Templates personnalisables
 
-> _Permettre à chaque projet d'adapter les stubs à ses conventions._
+> _Chaque projet peut adapter les stubs à ses conventions, sans forker Unitix._
 
-### Problème actuel
+### Problème résolu
 
-Les templates sont figés dans le code de Unitix. Un projet utilisant
-`describe.each`, `@faker-js/faker`, ou une convention de nommage spécifique
-ne peut pas personnaliser les stubs sans forker le package.
+Les templates étaient figés dans le code de Unitix. Un projet utilisant `describe.each`,
+`@faker-js/faker`, ou une convention de nommage spécifique ne pouvait pas personnaliser
+les stubs sans forker le package.
 
 ### Fonctionnalités
 
-- [ ] **Dossier `unitix/templates/` dans le projet** — si un fichier
+- [x] **Dossier `unitix/templates/` dans le projet** — si un fichier
   `unitix/templates/backend-use-case.mjs` existe, il prend la priorité
-  sur le template interne de Unitix (même interface de fonction `render(ctx)`)
-- [ ] **Variables de templates exposées** — documenter clairement le contexte
-  passé à chaque template (`BackendUseCaseTemplateContext`, etc.)
-- [ ] **Template `generic-unit`** — un template minimaliste pour les architectures
-  non reconnues, générant un squelette de test vide mais valide
+  sur le template interne de Unitix (même interface `export function render(ctx)`)
+- [x] **Variables de templates exposées** — `GenericUnitTemplateContext` ajouté dans `types.mjs`.
+  Tous les contextes (`BackendUseCaseTemplateContext`, `FrontendComponentTemplateContext`,
+  `FrontendHookTemplateContext`, `GenericUnitTemplateContext`) sont documentés et stables
+- [x] **Template `generic-unit`** — squelette minimaliste pour les architectures non reconnues :
+  marqueurs `@unitix:begin/end`, `describe/it` avec TODO, section personnalisée,
+  `coverageLevel` supporté (minimal/standard/exhaustive)
+- [x] **Module `utils/template-resolver.mjs`** — `loadUserTemplate()`, `hasUserTemplate()`,
+  `clearTemplateCache()`. Cache mémoire + compatibilité Windows via `pathToFileURL()`
+- [x] **Propagation dans les générateurs** — `generateBackendTest` et `generateFrontendTest`
+  acceptent `projectRoot` et vérifient l'override avant chaque rendu
+
+**Tests** : +30 nouveaux tests unitaires (template-resolver, generic-unit) — total 151/151.
 
 ---
 
@@ -343,4 +351,4 @@ ne peut pas personnaliser les stubs sans forker le package.
 
 ---
 
-_Dernière mise à jour : v0.6.0_
+_Dernière mise à jour : v0.7.0_
