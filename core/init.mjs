@@ -35,11 +35,11 @@ function makeColors(noColor) {
     return { bold: id, cyan: id, green: id, yellow: id, gray: id };
   }
   return {
-    bold:   (s) => `\x1b[1m${s}\x1b[0m`,
-    cyan:   (s) => `\x1b[36m${s}\x1b[0m`,
-    green:  (s) => `\x1b[32m${s}\x1b[0m`,
+    bold: (s) => `\x1b[1m${s}\x1b[0m`,
+    cyan: (s) => `\x1b[36m${s}\x1b[0m`,
+    green: (s) => `\x1b[32m${s}\x1b[0m`,
     yellow: (s) => `\x1b[33m${s}\x1b[0m`,
-    gray:   (s) => `\x1b[2m${s}\x1b[0m`,
+    gray: (s) => `\x1b[2m${s}\x1b[0m`,
   };
 }
 
@@ -72,7 +72,9 @@ async function confirm(rl, question, defaultYes = true) {
   const raw = await rl.question(`  ${question} ${hint}: `);
   const answer = raw.trim().toLowerCase();
   if (!answer) return defaultYes;
-  return answer === "y" || answer === "yes" || answer === "o" || answer === "oui";
+  return (
+    answer === "y" || answer === "yes" || answer === "o" || answer === "oui"
+  );
 }
 
 /**
@@ -156,6 +158,7 @@ async function hasReactQuery(projectRoot) {
  * @property {'jest'|'vitest'}  frontendFramework
  * @property {string|null}      renderWithProvidersPath
  * @property {string[]}         mutationPrefixes
+ * @property {'minimal'|'standard'|'exhaustive'} coverageLevel
  * @property {boolean}          createRenderHelper
  * @property {boolean}          setupMsw
  */
@@ -175,6 +178,7 @@ function renderConfigFile(answers) {
     `/** @type {import('@houthoofd/unitix').GeneratorConfig} */`,
     `export const config = {`,
     `  projectRoot: '.',`,
+    `  coverageLevel: '${answers.coverageLevel}',`,
   ];
 
   if (answers.hasBackend && answers.modulesDir) {
@@ -425,8 +429,7 @@ export async function runInit(projectRoot, options = {}) {
     console.error(
       `  ❌  Erreur lors de la détection : ${/** @type {Error} */ (err).message}`,
     );
-    if (verbose)
-      console.error(/** @type {Error} */ (err).stack);
+    if (verbose) console.error(/** @type {Error} */ (err).stack);
     process.exit(1);
   }
 
@@ -481,10 +484,13 @@ export async function runInit(projectRoot, options = {}) {
     hasFrontend: false,
     featuresDir: null,
     frontendFramework: /** @type {'jest'|'vitest'} */ (
-      fw.testRunner === "vitest" ? "vitest" : fw.testRunner ?? "vitest"
+      fw.testRunner === "vitest" ? "vitest" : (fw.testRunner ?? "vitest")
     ),
     renderWithProvidersPath: null,
     mutationPrefixes: ["useCreate", "useUpdate", "useDelete", "usePatch"],
+    coverageLevel: /** @type {'minimal'|'standard'|'exhaustive'} */ (
+      "standard"
+    ),
     createRenderHelper: false,
     setupMsw: false,
   };
@@ -526,9 +532,7 @@ export async function runInit(projectRoot, options = {}) {
 
       // Framework de test
       if (fw.testRunner === "jest" || fw.testRunner === "vitest") {
-        console.log(
-          `  ${C.gray("→")}  Test runner détecté : ${fw.testRunner}`,
-        );
+        console.log(`  ${C.gray("→")}  Test runner détecté : ${fw.testRunner}`);
         answers.backendFramework = /** @type {'jest'|'vitest'} */ (
           fw.testRunner
         );
@@ -576,9 +580,7 @@ export async function runInit(projectRoot, options = {}) {
 
       // Framework de test
       if (fw.testRunner === "jest" || fw.testRunner === "vitest") {
-        console.log(
-          `  ${C.gray("→")}  Test runner détecté : ${fw.testRunner}`,
-        );
+        console.log(`  ${C.gray("→")}  Test runner détecté : ${fw.testRunner}`);
         answers.frontendFramework = /** @type {'jest'|'vitest'} */ (
           fw.testRunner
         );
@@ -612,6 +614,32 @@ export async function runInit(projectRoot, options = {}) {
     console.log("");
   }
 
+  // ── Niveau de couverture ──────────────────────────────────────────────────
+  console.log(`  ${C.bold("Niveau de couverture")}`);
+  process.stdout.write(
+    `  Contrôle la densité des tests générés dans chaque stub.\n`,
+  );
+  process.stdout.write(
+    `  ${C.gray("minimal")}     — 1 it par élément (cas nominal uniquement)\n`,
+  );
+  process.stdout.write(
+    `  ${C.gray("standard")}    — nominal + cas d'erreur détectés ${C.gray("(recommandé)")}\n`,
+  );
+  process.stdout.write(
+    `  ${C.gray("exhaustive")}  — standard + appels repo, a11y, interactions, cache\n`,
+  );
+  console.log("");
+  const rawLevel = await choose(
+    rl,
+    "Niveau de couverture ?",
+    ["minimal", "standard", "exhaustive"],
+    "standard",
+  );
+  answers.coverageLevel = /** @type {'minimal'|'standard'|'exhaustive'} */ (
+    rawLevel
+  );
+  console.log("");
+
   // ── Récapitulatif ─────────────────────────────────────────────────────────────
   console.log(`  ${C.bold("Récapitulatif")}`);
 
@@ -626,9 +654,7 @@ export async function runInit(projectRoot, options = {}) {
     console.log(
       `  ${C.green("→")}  Backend  : ${C.cyan(rel)}  ${C.gray("[" + answers.backendFramework + "]")}`,
     );
-    console.log(
-      `              use-cases : ${C.gray(answers.useCasesGlob)}`,
-    );
+    console.log(`              use-cases : ${C.gray(answers.useCasesGlob)}`);
   }
 
   if (answers.hasFrontend && answers.featuresDir) {
@@ -643,6 +669,9 @@ export async function runInit(projectRoot, options = {}) {
     }
   }
 
+  console.log(
+    `  ${C.green("→")}  Couverture : ${C.cyan(answers.coverageLevel)}`,
+  );
   console.log("");
 
   const doWrite = await confirm(

@@ -136,6 +136,7 @@ async function generateComponentTest(filePath, config) {
     testFramework: config.testFramework ?? "vitest",
     renderHelper: config.renderHelper ?? null,
     sourceHash: sourceHash ?? undefined,
+    coverageLevel: config.coverageLevel ?? "standard",
   };
 
   // Étape 4 — Rendu
@@ -203,9 +204,10 @@ async function generateHookTest(filePath, config) {
     queryKeyNames: hookInfo.queryKeyNames,
     testFramework: config.testFramework ?? "vitest",
     mswHandlerImportPath,
-    renderHelper: config.renderHelper ?? null, // ← NOUVEAU
-    mutationPrefixes: config.mutationPrefixes ?? [], // ← NOUVEAU
+    renderHelper: config.renderHelper ?? null,
+    mutationPrefixes: config.mutationPrefixes ?? [],
     sourceHash: sourceHash ?? undefined,
+    coverageLevel: config.coverageLevel ?? "standard",
   };
 
   // Étape 5 — Rendu

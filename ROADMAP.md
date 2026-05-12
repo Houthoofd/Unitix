@@ -167,6 +167,36 @@ mode `--auto`, c'était un frein.
 
 ---
 
+## ✅ v0.5.1 — Niveaux de couverture configurable
+
+> _Adapter la densité des stubs générés au contexte du projet._
+
+### Problème résolu
+
+Unitix générait toujours le même nombre de tests peu importe la maturité du projet.
+Bootstrapper rapidement 200 stubs = `minimal`. Travailler en TDD strict = `exhaustive`.
+
+### Fonctionnalités
+
+- [x] **`CoverageLevel : 'minimal' | 'standard' | 'exhaustive'`** — nouveau type dans `types.mjs`
+- [x] **Config globale + override par workspace** — `config.coverageLevel` ET
+  `config.backend.coverageLevel` / `config.frontend.coverageLevel`
+- [x] **Backend — `minimal`** — 1 `it` : cas nominal uniquement
+- [x] **Backend — `standard`** _(défaut, comportement v0.4.x)_ — cas nominal + exceptions détectées
+- [x] **Backend — `exhaustive`** — standard + `toHaveBeenCalledWith` pour chaque méthode repo
+  + cas retour nullable + cas paramètres invalides/manquants
+- [x] **Frontend composant — `minimal`** — 1 `it` : rendu sans erreur
+- [x] **Frontend composant — `standard`** _(défaut)_ — rendu + contenu selon props
+- [x] **Frontend composant — `exhaustive`** — standard + accessibilité a11y + interaction
+  (`fireEvent`) + snapshot
+- [x] **Frontend hook — `minimal`** — 1 `it` par hook : appel sans erreur
+- [x] **Frontend hook — `standard`** _(défaut)_ — query: chargement+succès ; mutation: succès+erreur
+- [x] **Frontend hook — `exhaustive`** — standard + état de chargement explicite (query)
+  + invalidation de cache (mutation)
+- [x] **Wizard `unitix init`** — prompt interactif pour choisir le niveau
+
+---
+
 ## 📋 v0.6.0 — Performance & expérience développeur _(planifié)_
 
 > _Rendre Unitix rapide sur les grands projets et agréable à déboguer._
@@ -310,4 +340,4 @@ ne peut pas personnaliser les stubs sans forker le package.
 
 ---
 
-_Dernière mise à jour : v0.5.0_
+_Dernière mise à jour : v0.5.1_

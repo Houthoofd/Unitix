@@ -208,8 +208,25 @@ function renderQueryDescribe(
   hookName,
   feature,
   renderHelperName = "renderWithProviders",
+  coverageLevel = "standard",
 ) {
   const endpoint = deriveEndpointHint(hookName, feature);
+  const level = coverageLevel ?? "standard";
+
+  if (level === "minimal") {
+    return [
+      `describe('${hookName}', () => {`,
+      `  it("l'appel initial se déroule sans erreur", async () => {`,
+      `    // TODO: configurer MSW pour intercepter ${endpoint}`,
+      `    // const { result } = renderHook(() => ${hookName}(), {`,
+      `    //   wrapper: ${renderHelperName},`,
+      `    // });`,
+      `    // expect(result.current).toBeDefined();`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+      `});`,
+    ].join("\n");
+  }
 
   const lines = [
     `describe('${hookName}', () => {`,
@@ -222,9 +239,24 @@ function renderQueryDescribe(
     `    // expect(result.current.data).toBeDefined();`,
     `    expect(true).toBe(true); // placeholder — à remplacer`,
     `  });`,
-    `});`,
   ];
 
+  if (level === "exhaustive") {
+    lines.push(
+      ``,
+      `  it('devrait exposer l\'état de chargement (isLoading)', async () => {`,
+      `    // TODO: configurer MSW pour intercepter ${endpoint} avec un délai`,
+      `    // const { result } = renderHook(() => ${hookName}(), {`,
+      `    //   wrapper: ${renderHelperName},`,
+      `    // });`,
+      `    // expect(result.current.isLoading).toBe(true); // avant résolution`,
+      `    // await waitFor(() => expect(result.current.isLoading).toBe(false));`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+    );
+  }
+
+  lines.push(`});`);
   return lines.join("\n");
 }
 
@@ -241,8 +273,25 @@ function renderMutationDescribe(
   hookName,
   feature,
   renderHelperName = "renderWithProviders",
+  coverageLevel = "standard",
 ) {
   const endpoint = deriveEndpointHint(hookName, feature);
+  const level = coverageLevel ?? "standard";
+
+  if (level === "minimal") {
+    return [
+      `describe('${hookName}', () => {`,
+      `  it('devrait exécuter la mutation sans erreur', async () => {`,
+      `    // TODO: configurer MSW pour intercepter ${endpoint}`,
+      `    // const { result } = renderHook(() => ${hookName}(), {`,
+      `    //   wrapper: ${renderHelperName},`,
+      `    // });`,
+      `    // await act(async () => { result.current.mutate({ /* payload */ }); });`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+      `});`,
+    ].join("\n");
+  }
 
   const lines = [
     `describe('${hookName}', () => {`,
@@ -269,9 +318,24 @@ function renderMutationDescribe(
     `    // await waitFor(() => expect(result.current.isError).toBe(true));`,
     `    expect(true).toBe(true); // placeholder — à remplacer`,
     `  });`,
-    `});`,
   ];
 
+  if (level === "exhaustive") {
+    lines.push(
+      ``,
+      `  it('devrait invalider les queries associées après mutation réussie', async () => {`,
+      `    // TODO: vérifier queryClient.invalidateQueries() est appelé`,
+      `    // const queryClient = new QueryClient()`,
+      `    // const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries')`,
+      `    // ... render hook avec queryClient ...`,
+      `    // await act(async () => { result.current.mutate({ /* payload */ }); });`,
+      `    // await waitFor(() => expect(invalidateSpy).toHaveBeenCalled());`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+    );
+  }
+
+  lines.push(`});`);
   return lines.join("\n");
 }
 
@@ -289,11 +353,22 @@ function renderHookDescribe(
   feature,
   renderHelperName = "renderWithProviders",
   prefixes,
+  coverageLevel = "standard",
 ) {
   if (isMutationHook(hookName, prefixes)) {
-    return renderMutationDescribe(hookName, feature, renderHelperName);
+    return renderMutationDescribe(
+      hookName,
+      feature,
+      renderHelperName,
+      coverageLevel,
+    );
   }
-  return renderQueryDescribe(hookName, feature, renderHelperName);
+  return renderQueryDescribe(
+    hookName,
+    feature,
+    renderHelperName,
+    coverageLevel,
+  );
 }
 
 // ─── Export principal ─────────────────────────────────────────────────────────
@@ -382,6 +457,7 @@ export function renderFrontendHookTest(ctx) {
         safeCtx.feature,
         renderHelperName,
         safeCtx.mutationPrefixes,
+        safeCtx.coverageLevel ?? "standard",
       ),
     );
 

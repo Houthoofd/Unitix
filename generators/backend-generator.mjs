@@ -155,6 +155,7 @@ export async function generateBackendTest(filePath, config) {
     returnsBool: useCaseInfo.returnsBool ?? false,
     thrownExceptions: useCaseInfo.thrownExceptions ?? [],
     sourceHash: sourceHash ?? undefined,
+    coverageLevel: config.coverageLevel ?? "standard",
   };
 
   let content;

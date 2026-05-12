@@ -58,6 +58,7 @@ function buildConfigFromProfile(profile, overrides = {}) {
     skipExisting: overrides.skipExisting ?? true,
     verbose: overrides.verbose ?? false,
     sync: overrides.sync ?? false,
+    coverageLevel: overrides.coverageLevel ?? "standard",
   };
 
   const ws = config.workspace;

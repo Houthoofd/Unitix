@@ -326,6 +326,7 @@ function deriveExceptionContext(exceptionName) {
  * @returns {string}
  */
 function renderTests(ctx) {
+  const level = ctx.coverageLevel ?? "standard";
   const paramHints = renderExecuteParamHints(ctx.executeParams);
   const executeCall = renderExecuteCall(ctx.executeParams, ctx.isVoid);
   const assertHints = renderAssertHints(
@@ -335,7 +336,6 @@ function renderTests(ctx) {
     ctx.returnsBool,
   );
 
-  // Hint sur les args pour le cas d'erreur
   const hasParams = ctx.executeParams && ctx.executeParams.length > 0;
   const errorArgs = hasParams ? "input" : "";
 
@@ -358,60 +358,134 @@ function renderTests(ctx) {
     ...assertHints,
     `      expect(true).toBe(true); // placeholder — à remplacer`,
     `    });`,
-    ``,
-    `    // ${"─".repeat(2)} Cas d'erreur ${"─".repeat(53)}`,
-    ``,
   ];
 
-  // Cas d'erreur basés sur les exceptions détectées dans le source
-  if (ctx.thrownExceptions && ctx.thrownExceptions.length > 0) {
-    for (const exceptionName of ctx.thrownExceptions) {
-      // Dériver un libellé lisible depuis le nom de l'exception
-      const context = deriveExceptionContext(exceptionName);
+  // ── Cas d'erreur (standard + exhaustive) ─────────────────────────────────
+  if (level !== "minimal") {
+    lines.push(
+      ``,
+      `    // ${"─".repeat(2)} Cas d'erreur ${"─".repeat(53)}`,
+      ``,
+    );
+
+    if (ctx.thrownExceptions && ctx.thrownExceptions.length > 0) {
+      for (const exceptionName of ctx.thrownExceptions) {
+        const context = deriveExceptionContext(exceptionName);
+        lines.push(
+          `    it('devrait lancer ${exceptionName} ${context}', async () => {`,
+          `      // Arrange`,
+          `      // mockRepo.<méthode>.mockRejectedValue(new ${exceptionName}('Not found'));`,
+          ``,
+          `      // Act & Assert`,
+          `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow(${exceptionName});`,
+          `      expect(true).toBe(true); // placeholder — à remplacer`,
+          `    });`,
+          ``,
+        );
+      }
+    } else {
       lines.push(
-        `    it('devrait lancer ${exceptionName} ${context}', async () => {`,
+        `    it('devrait lancer une erreur si le repository échoue', async () => {`,
+        `      // Arrange`,
+        `      // mockRepo.<méthode>.mockRejectedValue(new Error('DB error'));`,
+        ``,
+        `      // Act & Assert`,
+        `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow('DB error');`,
+        `      expect(true).toBe(true); // placeholder — à remplacer`,
+        `    });`,
+        ``,
       );
-      lines.push(`      // Arrange`);
-      lines.push(
-        `      // mockRepo.<méthode>.mockRejectedValue(new ${exceptionName}('Not found'));`,
-      );
-      lines.push(``);
-      lines.push(`      // Act & Assert`);
-      lines.push(
-        `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow(${exceptionName});`,
-      );
-      lines.push(`      expect(true).toBe(true); // placeholder — à remplacer`);
-      lines.push(`    });`);
-      lines.push(``);
     }
-  } else {
-    // Cas d'erreur générique (comportement d'origine)
-    lines.push(
-      `    it('devrait lancer une erreur si le repository échoue', async () => {`,
-    );
-    lines.push(`      // Arrange`);
-    lines.push(
-      `      // mockRepo.<méthode>.mockRejectedValue(new Error('DB error'));`,
-    );
-    lines.push(``);
-    lines.push(`      // Act & Assert`);
-    lines.push(
-      `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow('DB error');`,
-    );
-    lines.push(`      expect(true).toBe(true); // placeholder — à remplacer`);
-    lines.push(`    });`);
-    lines.push(``);
   }
 
-  lines.push(
-    `    // TODO: Ajouter les cas de validation des paramètres (valeurs manquantes, invalides)`,
-  );
-  lines.push(
-    `    // TODO: Ajouter les cas de données inexistantes (ex: entité non trouvée → 404)`,
-  );
-  lines.push(``);
-  lines.push(`  });`);
-  lines.push(`});`);
+  // ── Vérification des appels + Cas limites (exhaustive only) ──────────────
+  if (level === "exhaustive") {
+    const repoCount = ctx.repositories.length;
+    const hasRepoMethods = ctx.repositories.some((r) => r.methods.length > 0);
+
+    if (hasRepoMethods) {
+      lines.push(
+        ``,
+        `    // ${"─".repeat(2)} Vérification des appels repository ${"─".repeat(30)}`,
+        ``,
+      );
+      for (const repo of ctx.repositories) {
+        const varName = mockVarName(repo.paramName, repoCount);
+        for (const method of repo.methods) {
+          lines.push(
+            `    it('devrait appeler ${varName}.${method.name} avec les bons paramètres', async () => {`,
+            `      // Arrange`,
+            ...paramHints,
+            ``,
+            `      // Act`,
+            executeCall,
+            ``,
+            `      // Assert`,
+            `      // expect(${varName}.${method.name}).toHaveBeenCalledWith(/* paramètres attendus */);`,
+            `      // expect(${varName}.${method.name}).toHaveBeenCalledTimes(1);`,
+            `      expect(true).toBe(true); // placeholder — à remplacer`,
+            `    });`,
+            ``,
+          );
+        }
+      }
+    }
+
+    // Cas limites
+    lines.push(`    // ${"─".repeat(2)} Cas limites ${"─".repeat(54)}`, ``);
+
+    const isNullable =
+      ctx.returnType &&
+      (/\|\s*null/.test(ctx.returnType) ||
+        /null\s*\|/.test(ctx.returnType) ||
+        /\|\s*undefined/.test(ctx.returnType));
+
+    if (isNullable) {
+      lines.push(
+        `    it("devrait retourner null si aucune donnée n'est trouvée", async () => {`,
+        `      // Arrange`,
+        `      // mockRepo.<méthode>.mockResolvedValue(null);`,
+        ``,
+        `      // Act`,
+        executeCall,
+        ``,
+        `      // Assert`,
+        `      // expect(result).toBeNull();`,
+        `      expect(true).toBe(true); // placeholder — à remplacer`,
+        `    });`,
+        ``,
+      );
+    }
+
+    if (hasParams) {
+      lines.push(
+        `    it('devrait gérer des paramètres invalides ou manquants', async () => {`,
+        `      // Act & Assert`,
+        `      // await expect(useCase.execute(undefined as any)).rejects.toThrow();`,
+        `      expect(true).toBe(true); // placeholder — à remplacer`,
+        `    });`,
+        ``,
+      );
+    }
+
+    if (!isNullable && !hasParams) {
+      lines.push(
+        `    // TODO: Ajouter les cas limites spécifiques à ce use-case`,
+        ``,
+      );
+    }
+  }
+
+  // ── TODOs (minimal + standard only) ──────────────────────────────────────
+  if (level !== "exhaustive") {
+    lines.push(
+      `    // TODO: Ajouter les cas de validation des paramètres (valeurs manquantes, invalides)`,
+      `    // TODO: Ajouter les cas de données inexistantes (ex: entité non trouvée → 404)`,
+      ``,
+    );
+  }
+
+  lines.push(`  });`, `});`);
 
   return lines.join("\n");
 }

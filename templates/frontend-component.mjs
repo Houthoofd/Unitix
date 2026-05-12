@@ -172,10 +172,9 @@ function renderPropsHint(ctx) {
  * @returns {string}
  */
 function renderTests(ctx) {
+  const level = ctx.coverageLevel ?? "standard";
   const renderFn = renderFnName(ctx);
   const propsHint = renderPropsHint(ctx);
-
-  // Exemple de JSX dans le commentaire — utilise le nom du composant
   const jsxExample = `<${ctx.componentName} {...props} />`;
 
   const lines = [
@@ -193,32 +192,72 @@ function renderTests(ctx) {
     `    // expect(screen.getByRole(...)).toBeInTheDocument();`,
     `    expect(true).toBe(true); // placeholder — à remplacer`,
     `  });`,
-    ``,
-    `  it('devrait afficher le contenu correct selon les props', () => {`,
-    `    // TODO: tester les différentes valeurs possibles des props`,
   ];
 
-  // Hint spécifique si on a des props connues
-  if (ctx.propsFields && ctx.propsFields.length > 0) {
-    const firstProp = ctx.propsFields[0];
-    lines.push(`    // ex: ${firstProp} = '<valeur_a>' → résultat attendu A`);
-    lines.push(`    // ex: ${firstProp} = '<valeur_b>' → résultat attendu B`);
-  } else {
+  // ── Standard + exhaustive : test contenu selon les props ─────────────────
+  if (level !== "minimal") {
+    lines.push(``);
     lines.push(
-      `    // ex: prop = 'valeur_a' → classe CSS X, texte "Libellé A"`,
+      `  it('devrait afficher le contenu correct selon les props', () => {`,
+    );
+    lines.push(
+      `    // TODO: tester les différentes valeurs possibles des props`,
+    );
+
+    if (ctx.propsFields && ctx.propsFields.length > 0) {
+      const firstProp = ctx.propsFields[0];
+      lines.push(`    // ex: ${firstProp} = '<valeur_a>' → résultat attendu A`);
+      lines.push(`    // ex: ${firstProp} = '<valeur_b>' → résultat attendu B`);
+    } else {
+      lines.push(
+        `    // ex: prop = 'valeur_a' → classe CSS X, texte "Libellé A"`,
+      );
+    }
+
+    lines.push(
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
     );
   }
 
-  lines.push(
-    `    expect(true).toBe(true); // placeholder — à remplacer`,
-    `  });`,
-    ``,
-    `  // TODO: Ajouter un test par prop optionnelle importante`,
-    `  // TODO: Tester les états disabled/loading si applicable`,
-    ``,
-    `});`,
-  );
+  // ── Exhaustive : a11y + interaction + snapshot ────────────────────────────
+  if (level === "exhaustive") {
+    lines.push(
+      ``,
+      `  it('devrait être accessible (rôles ARIA corrects)', () => {`,
+      `    // ${renderFn}(${jsxExample});`,
+      `    // const button  = screen.queryByRole('button');`,
+      `    // const heading = screen.queryByRole('heading');`,
+      `    // TODO: vérifier que les éléments interactifs ont les bons rôles ARIA`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+      ``,
+      `  it('devrait répondre aux interactions utilisateur', () => {`,
+      `    // import { fireEvent } from '@testing-library/react'`,
+      `    // ${renderFn}(${jsxExample});`,
+      `    // fireEvent.click(screen.getByRole('button', { name: /texte/i }));`,
+      `    // expect(screen.getBy...).toBeInTheDocument();`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+      ``,
+      `  it('devrait correspondre au snapshot', () => {`,
+      `    // const { container } = ${renderFn}(${jsxExample});`,
+      `    // expect(container.firstChild).toMatchSnapshot();`,
+      `    expect(true).toBe(true); // placeholder — à remplacer`,
+      `  });`,
+    );
+  }
 
+  // ── TODOs (standard only) ─────────────────────────────────────────────────
+  if (level === "standard") {
+    lines.push(
+      ``,
+      `  // TODO: Ajouter un test par prop optionnelle importante`,
+      `  // TODO: Tester les états disabled/loading si applicable`,
+    );
+  }
+
+  lines.push(``, `});`);
   return lines.join("\n");
 }
 

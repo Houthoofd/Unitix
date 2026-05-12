@@ -15,6 +15,19 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+// ─── Niveaux de couverture ─────────────────────────────────────────────────────
+
+/**
+ * Niveau de couverture des tests générés.
+ *
+ * - `minimal`     — Cas nominal uniquement (1 `it` par élément)
+ * - `standard`    — Cas nominal + cas d'erreur détectés (comportement par défaut)
+ * - `exhaustive`  — Standard + vérification des appels repo, cas limites,
+ *                   accessibilité a11y, interactions, invalidation de cache
+ *
+ * @typedef {'minimal'|'standard'|'exhaustive'} CoverageLevel
+ */
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 /**
@@ -27,6 +40,7 @@
  * @property {'jest'|'vitest'}    [testFramework]     - Framework de test (défaut: 'jest')
  * @property {string}             [testFileExtension] - Extension test (défaut: '.test.ts')
  * @property {Record<string,string>} [importAliases]  - Alias d'imports (ex: {'@/': '/abs/src/'})
+ * @property {CoverageLevel}         [coverageLevel]  - Niveau de couverture (défaut: 'standard')
  */
 
 /**
@@ -43,6 +57,7 @@
  * @property {{ name: string, importPath: string }} [renderHelper] - Wrapper de rendu custom
  * @property {string}         [setupFile]             - Chemin du fichier de setup Vitest
  * @property {string[]}        [mutationPrefixes]      - Préfixes de hooks de mutation (ex: ['useCreate', 'useDelete'])
+ * @property {CoverageLevel}   [coverageLevel]         - Niveau de couverture (défaut: 'standard')
  */
 
 /**
@@ -60,6 +75,7 @@
  * @property {boolean}                   [dryRun]       - Prévisualiser sans écrire  (défaut: false)
  * @property {boolean}                   [force]        - Écraser les fichiers       (défaut: false)
  * @property {boolean}                   [verbose]      - Détails de parsing         (défaut: false)
+ * @property {CoverageLevel}             [coverageLevel] - Niveau de couverture global (défaut: 'standard')
  */
 
 // ─── Parsers — données extraites ──────────────────────────────────────────────
@@ -177,6 +193,7 @@
  * @property {boolean}           [returnsBool]         - true si execute retourne un booléen
  * @property {string[]}          [thrownExceptions]    - Exceptions détectées dans execute() (ex: ['NotFoundException'])
  * @property {string}            [sourceHash]          - Hash SHA-256 court du fichier source (pour @unitix-source-hash)
+ * @property {CoverageLevel}     [coverageLevel]       - Niveau de couverture (défaut: 'standard')
  */
 
 /**
@@ -193,6 +210,7 @@
  * @property {string}   testFramework    - 'vitest'
  * @property {{ name: string, importPath: string }|null} renderHelper - Wrapper de rendu
  * @property {string}  [sourceHash]     - Hash SHA-256 court du fichier source
+ * @property {CoverageLevel} [coverageLevel] - Niveau de couverture (défaut: 'standard')
  */
 
 /**
@@ -210,6 +228,7 @@
  * @property {{ name: string, importPath: string }|null} renderHelper - Wrapper de rendu custom (comme FrontendComponentTemplateContext)
  * @property {string[]} [mutationPrefixes]  - Préfixes de hooks de mutation (configurable)
  * @property {string}   [sourceHash]        - Hash SHA-256 court du fichier source
+ * @property {CoverageLevel} [coverageLevel] - Niveau de couverture (défaut: 'standard')
  */
 
 // ─── Résultats & Résumé ───────────────────────────────────────────────────────
