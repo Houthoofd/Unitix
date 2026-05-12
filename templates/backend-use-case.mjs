@@ -19,11 +19,11 @@
  * @returns {string}
  */
 function indent(str, n) {
-  const pad = ' '.repeat(n);
+  const pad = " ".repeat(n);
   return str
-    .split('\n')
-    .map(line => (line.trim() === '' ? '' : pad + line))
-    .join('\n');
+    .split("\n")
+    .map((line) => (line.trim() === "" ? "" : pad + line))
+    .join("\n");
 }
 
 /**
@@ -36,7 +36,7 @@ function indent(str, n) {
  * @returns {string}
  */
 function mockVarName(paramName, repoCount) {
-  if (repoCount === 1) return 'mockRepo';
+  if (repoCount === 1) return "mockRepo";
   // Capitalise la première lettre du paramName pour l'assembler
   const capitalized = paramName.charAt(0).toUpperCase() + paramName.slice(1);
   return `mock${capitalized}`;
@@ -66,13 +66,16 @@ function renderHeader(ctx) {
     `/**`,
     ` * ${ctx.className}.test.ts`,
     ` * Tests unitaires — ${ctx.module} / ${ctx.className}`,
-    ` * ${'─'.repeat(77)}`,
-    ` * Généré par : scripts/generate-tests.mjs`,
-    ` * Sprint     : Tests 1 — Use-Cases Backend`,
+    ` * ${"─".repeat(77)}`,
+    ` * G\u00e9n\u00e9r\u00e9 par : Unitix v0.4.1`,
     ` * Module     : ${ctx.module}`,
     ` */`,
   ];
-  return lines.join('\n');
+  // Ligne de hash de synchronisation (présente uniquement si le hash source est fourni)
+  if (ctx.sourceHash) {
+    lines.push(`// @unitix-source-hash: ${ctx.sourceHash}`);
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -92,7 +95,7 @@ function renderImports(ctx) {
     for (const servicePath of ctx.externalServiceMocks) {
       lines.push(`jest.mock('${servicePath}');`);
     }
-    lines.push('');
+    lines.push("");
   }
 
   // ── Import du use-case ────────────────────────────────────────────────────
@@ -100,10 +103,12 @@ function renderImports(ctx) {
 
   // ── Imports des interfaces repository (type-only) ─────────────────────────
   for (const repo of ctx.repositories) {
-    lines.push(`import type { ${repo.interfaceName} } from '${repo.importPath}';`);
+    lines.push(
+      `import type { ${repo.interfaceName} } from '${repo.importPath}';`,
+    );
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -116,19 +121,28 @@ function renderImports(ctx) {
  */
 function renderSingleMock(repo, varName) {
   const maxLen = maxMethodNameLength(repo.methods);
-  const lines  = [];
+  const lines = [];
 
   lines.push(`const ${varName}: jest.Mocked<${repo.interfaceName}> = {`);
 
   for (const method of repo.methods) {
     // Padding pour aligner les jest.fn() sur la même colonne
-    const padding = ' '.repeat(maxLen - method.name.length);
-    lines.push(`  ${method.name}:${padding}   jest.fn(),`);
+    const padding = " ".repeat(maxLen - method.name.length);
+    // Ajouter .mockResolvedValue() si la valeur de retour est connue
+    const mockValue =
+      method.mockReturn && method.mockReturn !== "{}"
+        ? method.mockReturn
+        : null;
+    const mockFn =
+      mockValue !== null
+        ? `jest.fn().mockResolvedValue(${mockValue})`
+        : `jest.fn()`;
+    lines.push(`  ${method.name}:${padding}   ${mockFn},`);
   }
 
   lines.push(`} as jest.Mocked<${repo.interfaceName}>;`);
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -139,18 +153,20 @@ function renderSingleMock(repo, varName) {
  */
 function renderMocks(ctx) {
   const lines = [];
-  lines.push(`// ${'─'.repeat(3)} Mock ${ctx.repositories.length > 1 ? 'Repositories' : 'Repository'} ${'─'.repeat(44)}`);
-  lines.push('');
+  lines.push(
+    `// ${"─".repeat(3)} Mock ${ctx.repositories.length > 1 ? "Repositories" : "Repository"} ${"─".repeat(44)}`,
+  );
+  lines.push("");
 
   const repoCount = ctx.repositories.length;
 
   for (const repo of ctx.repositories) {
     const varName = mockVarName(repo.paramName, repoCount);
     lines.push(renderSingleMock(repo, varName));
-    lines.push('');
+    lines.push("");
   }
 
-  return lines.join('\n').trimEnd();
+  return lines.join("\n").trimEnd();
 }
 
 /**
@@ -162,15 +178,15 @@ function renderMocks(ctx) {
 function renderSetup(ctx) {
   const repoCount = ctx.repositories.length;
   // Arguments passés au constructeur dans le même ordre que ctx.repositories
-  const ctorArgs  = ctx.repositories
-    .map(r => mockVarName(r.paramName, repoCount))
-    .join(', ');
+  const ctorArgs = ctx.repositories
+    .map((r) => mockVarName(r.paramName, repoCount))
+    .join(", ");
 
   const lines = [
-    `// ${'─'.repeat(3)} Setup ${'─'.repeat(52)}`,
-    '',
+    `// ${"─".repeat(3)} Setup ${"─".repeat(52)}`,
+    "",
     `let useCase: ${ctx.className};`,
-    '',
+    "",
     `beforeEach(() => {`,
     `  useCase = new ${ctx.className}(${ctorArgs});`,
     `});`,
@@ -178,13 +194,13 @@ function renderSetup(ctx) {
 
   // Ajout d'un afterEach pour réinitialiser les mocks si plusieurs repos
   if (repoCount > 0) {
-    lines.push('');
+    lines.push("");
     lines.push(`afterEach(() => {`);
     lines.push(`  jest.clearAllMocks();`);
     lines.push(`});`);
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -196,12 +212,14 @@ function renderSetup(ctx) {
  */
 function renderExecuteParamHints(params) {
   if (!params || params.length === 0) {
-    return [`      // TODO: configurer le mock → mockRepo.<méthode>.mockResolvedValue(...)`];
+    return [
+      `      // TODO: configurer le mock → mockRepo.<méthode>.mockResolvedValue(...)`,
+    ];
   }
 
   const paramList = params
-    .map(p => `${p.name}${p.optional ? '?' : ''}: ${p.type}`)
-    .join(', ');
+    .map((p) => `${p.name}${p.optional ? "?" : ""}: ${p.type}`)
+    .join(", ");
 
   return [
     `      // TODO: configurer le mock → mockRepo.<méthode>.mockResolvedValue(...)`,
@@ -218,8 +236,8 @@ function renderExecuteParamHints(params) {
  */
 function renderExecuteCall(params, isVoid) {
   const hasParams = params && params.length > 0;
-  const args      = hasParams ? 'input' : '';
-  const assign    = isVoid ? '' : 'const result = ';
+  const args = hasParams ? "input" : "";
+  const assign = isVoid ? "" : "const result = ";
   return `      // ${assign}await useCase.execute(${args});`;
 }
 
@@ -228,18 +246,77 @@ function renderExecuteCall(params, isVoid) {
  *
  * @param {boolean} isVoid
  * @param {string}  returnType
+ * @param {boolean} returnsArray
+ * @param {boolean} returnsBool
  * @returns {string[]}
  */
-function renderAssertHints(isVoid, returnType) {
+function renderAssertHints(isVoid, returnType, returnsArray, returnsBool) {
   if (isVoid) {
+    return [`      // expect(mockRepo.<méthode>).toHaveBeenCalledTimes(1);`];
+  }
+  if (returnsArray) {
     return [
-      `      // expect(mockRepo.<méthode>).toHaveBeenCalledWith(...);`,
+      `      // expect(result).toEqual(expect.arrayContaining([]));`,
+      `      // expect(Array.isArray(result)).toBe(true);`,
     ];
   }
+  if (returnsBool) {
+    return [`      // expect(result).toBe(true);`];
+  }
+  if (returnType === "string") {
+    return [`      // expect(result).toBeTruthy();`];
+  }
+  if (returnType === "number") {
+    return [`      // expect(typeof result).toBe('number');`];
+  }
+  // Objet / DTO par défaut
   return [
     `      // expect(result).toBeDefined();`,
-    `      // expect(mockRepo.<méthode>).toHaveBeenCalledWith(...);`,
+    `      // expect(result).toMatchObject({});`,
   ];
+}
+
+/**
+ * Dérive un contexte de test lisible depuis le nom d'une exception.
+ * Utilisé pour nommer les cas de test d'erreur générés automatiquement.
+ *
+ * @param {string} exceptionName - Nom de la classe d'exception (ex: 'NotFoundException')
+ * @returns {string} Contexte au format "si ..."
+ */
+function deriveExceptionContext(exceptionName) {
+  // Table de correspondance exacte
+  const EXACT = {
+    NotFoundException: "si l'entité n'est pas trouvée",
+    ForbiddenException: "si l'accès est refusé",
+    UnauthorizedException: "si l'utilisateur n'est pas authentifié",
+    BadRequestException: "si les données sont invalides",
+    ConflictException: "si une ressource en conflit existe déjà",
+    ValidationException: "si la validation échoue",
+    ValidationError: "si la validation échoue",
+    NotImplementedException: "si la fonctionnalité n'est pas implémentée",
+    InternalServerErrorException: "si une erreur serveur survient",
+    PayloadTooLargeException: "si le payload est trop volumineux",
+    ServiceUnavailableException: "si le service est indisponible",
+    GatewayTimeoutException: "si le service externe ne répond pas",
+    Error: "si une erreur interne survient",
+  };
+  if (EXACT[exceptionName]) return EXACT[exceptionName];
+
+  // Patterns par sous-chaîne (pour les classes custom dérivées)
+  if (/NotFound/i.test(exceptionName)) return "si l'entité n'est pas trouvée";
+  if (/Forbidden/i.test(exceptionName)) return "si l'accès est refusé";
+  if (/Unauthorized/i.test(exceptionName))
+    return "si l'utilisateur n'est pas authentifié";
+  if (/BadRequest|Invalid/i.test(exceptionName))
+    return "si les données sont invalides";
+  if (/Conflict/i.test(exceptionName))
+    return "si une ressource en conflit existe déjà";
+  if (/Validation/i.test(exceptionName)) return "si la validation échoue";
+  if (/Timeout/i.test(exceptionName))
+    return "si le délai d'attente est dépassé";
+
+  // Fallback générique
+  return "si une exception est lancée";
 }
 
 /**
@@ -249,22 +326,27 @@ function renderAssertHints(isVoid, returnType) {
  * @returns {string}
  */
 function renderTests(ctx) {
-  const paramHints   = renderExecuteParamHints(ctx.executeParams);
-  const executeCall  = renderExecuteCall(ctx.executeParams, ctx.isVoid);
-  const assertHints  = renderAssertHints(ctx.isVoid, ctx.returnType);
+  const paramHints = renderExecuteParamHints(ctx.executeParams);
+  const executeCall = renderExecuteCall(ctx.executeParams, ctx.isVoid);
+  const assertHints = renderAssertHints(
+    ctx.isVoid,
+    ctx.returnType,
+    ctx.returnsArray,
+    ctx.returnsBool,
+  );
 
   // Hint sur les args pour le cas d'erreur
   const hasParams = ctx.executeParams && ctx.executeParams.length > 0;
-  const errorArgs = hasParams ? 'input' : '';
+  const errorArgs = hasParams ? "input" : "";
 
   const lines = [
-    `// ${'─'.repeat(3)} Tests ${'─'.repeat(52)}`,
-    '',
+    `// ${"─".repeat(3)} Tests ${"─".repeat(52)}`,
+    "",
     `describe('${ctx.className}', () => {`,
     `  describe('execute', () => {`,
-    '',
-    `    // ${'─'.repeat(2)} Cas nominaux ${'─'.repeat(53)}`,
-    '',
+    "",
+    `    // ${"─".repeat(2)} Cas nominaux ${"─".repeat(53)}`,
+    "",
     `    it('devrait retourner le résultat quand les données sont valides', async () => {`,
     `      // Arrange`,
     ...paramHints,
@@ -277,25 +359,61 @@ function renderTests(ctx) {
     `      expect(true).toBe(true); // placeholder — à remplacer`,
     `    });`,
     ``,
-    `    // ${'─'.repeat(2)} Cas d'erreur ${'─'.repeat(53)}`,
+    `    // ${"─".repeat(2)} Cas d'erreur ${"─".repeat(53)}`,
     ``,
-    `    it('devrait lancer une erreur si le repository échoue', async () => {`,
-    `      // Arrange`,
-    `      // mockRepo.<méthode>.mockRejectedValue(new Error('DB error'));`,
-    ``,
-    `      // Act & Assert`,
-    `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow('DB error');`,
-    `      expect(true).toBe(true); // placeholder — à remplacer`,
-    `    });`,
-    ``,
-    `    // TODO: Ajouter les cas de validation des paramètres (valeurs manquantes, invalides)`,
-    `    // TODO: Ajouter les cas de données inexistantes (ex: entité non trouvée → 404)`,
-    ``,
-    `  });`,
-    `});`,
   ];
 
-  return lines.join('\n');
+  // Cas d'erreur basés sur les exceptions détectées dans le source
+  if (ctx.thrownExceptions && ctx.thrownExceptions.length > 0) {
+    for (const exceptionName of ctx.thrownExceptions) {
+      // Dériver un libellé lisible depuis le nom de l'exception
+      const context = deriveExceptionContext(exceptionName);
+      lines.push(
+        `    it('devrait lancer ${exceptionName} ${context}', async () => {`,
+      );
+      lines.push(`      // Arrange`);
+      lines.push(
+        `      // mockRepo.<méthode>.mockRejectedValue(new ${exceptionName}('Not found'));`,
+      );
+      lines.push(``);
+      lines.push(`      // Act & Assert`);
+      lines.push(
+        `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow(${exceptionName});`,
+      );
+      lines.push(`      expect(true).toBe(true); // placeholder — à remplacer`);
+      lines.push(`    });`);
+      lines.push(``);
+    }
+  } else {
+    // Cas d'erreur générique (comportement d'origine)
+    lines.push(
+      `    it('devrait lancer une erreur si le repository échoue', async () => {`,
+    );
+    lines.push(`      // Arrange`);
+    lines.push(
+      `      // mockRepo.<méthode>.mockRejectedValue(new Error('DB error'));`,
+    );
+    lines.push(``);
+    lines.push(`      // Act & Assert`);
+    lines.push(
+      `      // await expect(useCase.execute(${errorArgs})).rejects.toThrow('DB error');`,
+    );
+    lines.push(`      expect(true).toBe(true); // placeholder — à remplacer`);
+    lines.push(`    });`);
+    lines.push(``);
+  }
+
+  lines.push(
+    `    // TODO: Ajouter les cas de validation des paramètres (valeurs manquantes, invalides)`,
+  );
+  lines.push(
+    `    // TODO: Ajouter les cas de données inexistantes (ex: entité non trouvée → 404)`,
+  );
+  lines.push(``);
+  lines.push(`  });`);
+  lines.push(`});`);
+
+  return lines.join("\n");
 }
 
 // ─── Export principal ─────────────────────────────────────────────────────────
@@ -329,39 +447,53 @@ function renderTests(ctx) {
  */
 export function renderBackendUseCaseTest(ctx) {
   // Validation défensive du contexte
-  if (!ctx || typeof ctx !== 'object') {
-    throw new TypeError('[renderBackendUseCaseTest] ctx doit être un objet non-null');
+  if (!ctx || typeof ctx !== "object") {
+    throw new TypeError(
+      "[renderBackendUseCaseTest] ctx doit être un objet non-null",
+    );
   }
   if (!ctx.className) {
-    throw new TypeError('[renderBackendUseCaseTest] ctx.className est requis');
+    throw new TypeError("[renderBackendUseCaseTest] ctx.className est requis");
   }
   if (!Array.isArray(ctx.repositories)) {
-    throw new TypeError('[renderBackendUseCaseTest] ctx.repositories doit être un tableau');
+    throw new TypeError(
+      "[renderBackendUseCaseTest] ctx.repositories doit être un tableau",
+    );
   }
 
   // Normalisation des champs optionnels
   const safeCtx = {
     ...ctx,
     externalServiceMocks: ctx.externalServiceMocks ?? [],
-    executeParams:        ctx.executeParams        ?? [],
-    isVoid:               ctx.isVoid               ?? false,
-    returnType:           ctx.returnType           ?? 'unknown',
+    executeParams: ctx.executeParams ?? [],
+    isVoid: ctx.isVoid ?? false,
+    returnType: ctx.returnType ?? "unknown",
+    returnsArray: ctx.returnsArray ?? false,
+    returnsBool: ctx.returnsBool ?? false,
+    thrownExceptions: ctx.thrownExceptions ?? [],
   };
 
   const sections = [
     renderHeader(safeCtx),
-    '',
+    "",
+    "// @unitix:begin",
+    "",
     renderImports(safeCtx),
-    '',
+    "",
     renderMocks(safeCtx),
-    '',
-    '',
+    "",
+    "",
     renderSetup(safeCtx),
-    '',
-    '',
+    "",
+    "",
     renderTests(safeCtx),
-    '', // newline final
+    "// @unitix:end",
+    "",
+    `// ${"─".repeat(3)} Tests personnalisés ${"─".repeat(39)}`,
+    `// Les blocs ci-dessous sont préservés lors d'un \`unitix --sync\`.`,
+    `// Ajoutez ici vos tests supplémentaires pour ce use-case.`,
+    "",
   ];
 
-  return sections.join('\n');
+  return sections.join("\n");
 }

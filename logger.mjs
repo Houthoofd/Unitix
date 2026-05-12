@@ -6,16 +6,16 @@
 
 // ─── Codes ANSI ──────────────────────────────────────────────────────────────
 
-const RESET  = '\x1b[0m';
-const BOLD   = '\x1b[1m';
-const DIM    = '\x1b[2m';
+const RESET = "\x1b[0m";
+const BOLD = "\x1b[1m";
+const DIM = "\x1b[2m";
 
-const FG_RED     = '\x1b[31m';
-const FG_GREEN   = '\x1b[32m';
-const FG_YELLOW  = '\x1b[33m';
-const FG_BLUE    = '\x1b[34m';
-const FG_CYAN    = '\x1b[36m';
-const FG_GRAY    = '\x1b[90m';
+const FG_RED = "\x1b[31m";
+const FG_GREEN = "\x1b[32m";
+const FG_YELLOW = "\x1b[33m";
+const FG_BLUE = "\x1b[34m";
+const FG_CYAN = "\x1b[36m";
+const FG_GRAY = "\x1b[90m";
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
 
@@ -27,7 +27,8 @@ const FG_GRAY    = '\x1b[90m';
  * @returns {string}
  */
 function colorize(msg, ...codes) {
-  return `${codes.join('')}${msg}${RESET}`;
+  if (_noColor) return String(msg);
+  return `${codes.join("")}${msg}${RESET}`;
 }
 
 /**
@@ -37,7 +38,7 @@ function colorize(msg, ...codes) {
  * @param {string} [char='─']  - Caractère utilisé
  * @returns {string}
  */
-function separator(length = 45, char = '─') {
+function separator(length = 45, char = "─") {
   return char.repeat(length);
 }
 
@@ -45,11 +46,52 @@ function separator(length = 45, char = '─') {
 
 /** @type {Record<string, { icon: string, label: string, color: string }>} */
 const FILE_STATUS = {
-  created: { icon: '✅', label: 'CRÉÉ   ', color: FG_GREEN  },
-  skipped: { icon: '⏭ ', label: 'IGNORÉ ', color: FG_YELLOW },
-  'dry-run':{ icon: '🔍', label: 'DRY-RUN', color: FG_CYAN  },
-  error:   { icon: '❌', label: 'ERREUR ', color: FG_RED    },
+  created: { icon: "✅", label: "CRÉÉ   ", color: FG_GREEN },
+  skipped: { icon: "⏭ ", label: "IGNORÉ ", color: FG_YELLOW },
+  "dry-run": { icon: "🔍", label: "DRY-RUN", color: FG_CYAN },
+  error: { icon: "❌", label: "ERREUR ", color: FG_RED },
+  synced: { icon: "🔄", label: "SYNC   ", color: FG_CYAN },
 };
+
+// ─── Mode silencieux (--json) ─────────────────────────────────────────────────
+let _quiet = false;
+
+// ─── Mode sans couleur (--no-color) ─────────────────────────────────────────
+let _noColor = false;
+
+/**
+ * Active ou désactive le mode silencieux.
+ * En mode silencieux, les logs vont sur stderr au lieu de stdout.
+ * Permet d'avoir un stdout propre pour la sortie JSON.
+ *
+ * @param {boolean} val
+ */
+export function setQuiet(val) {
+  _quiet = val;
+}
+
+/**
+ * Active ou désactive le mode sans couleur.
+ * En mode sans couleur, `colorize()` retourne le texte brut sans codes ANSI.
+ *
+ * @param {boolean} val
+ */
+export function setNoColor(val) {
+  _noColor = val;
+}
+
+/**
+ * Écrit un message sur le flux approprié (stdout normal, stderr si quiet).
+ *
+ * @param {string} msg
+ */
+function logOut(msg) {
+  if (_quiet) {
+    process.stderr.write(msg + "\n");
+  } else {
+    console.log(msg);
+  }
+}
 
 // ─── Export principal ─────────────────────────────────────────────────────────
 
@@ -71,7 +113,7 @@ export const logger = {
    * @returns {void}
    */
   info(msg) {
-    console.log(`${colorize('ℹ ', FG_CYAN)}  ${msg}`);
+    logOut(`${colorize("ℹ ", FG_CYAN)}  ${msg}`);
   },
 
   /**
@@ -81,7 +123,7 @@ export const logger = {
    * @returns {void}
    */
   success(msg) {
-    console.log(`✅ ${colorize(msg, FG_GREEN)}`);
+    logOut(`✅ ${colorize(msg, FG_GREEN)}`);
   },
 
   /**
@@ -91,7 +133,7 @@ export const logger = {
    * @returns {void}
    */
   warn(msg) {
-    console.warn(`${colorize('⚠ ', FG_YELLOW)}  ${colorize(msg, FG_YELLOW)}`);
+    console.warn(`${colorize("⚠ ", FG_YELLOW)}  ${colorize(msg, FG_YELLOW)}`);
   },
 
   /**
@@ -113,7 +155,7 @@ export const logger = {
    */
   debug(msg, verbose) {
     if (!verbose) return;
-    console.log(`${colorize('🔍', FG_GRAY)} ${colorize(msg, FG_GRAY, DIM)}`);
+    console.log(`${colorize("🔍", FG_GRAY)} ${colorize(msg, FG_GRAY, DIM)}`);
   },
 
   /**
@@ -125,10 +167,10 @@ export const logger = {
   section(title) {
     const sep = separator(45);
     const titleUpper = title.toUpperCase();
-    console.log('');
-    console.log(colorize(sep, FG_BLUE, BOLD));
-    console.log(colorize(`  ${titleUpper}`, FG_BLUE, BOLD));
-    console.log(colorize(sep, FG_BLUE, BOLD));
+    logOut("");
+    logOut(colorize(sep, FG_BLUE, BOLD));
+    logOut(colorize(`  ${titleUpper}`, FG_BLUE, BOLD));
+    logOut(colorize(sep, FG_BLUE, BOLD));
   },
 
   /**
@@ -141,18 +183,18 @@ export const logger = {
    *   - 'error'    → ❌ ERREUR  path/to/file.test.ts  (message)
    *
    * @param {string} filePath - Chemin du fichier concerné
-   * @param {'created'|'skipped'|'dry-run'|'error'} status - Statut du fichier
+   * @param {'created'|'skipped'|'dry-run'|'error'|'synced'} status - Statut du fichier
    * @param {string} [reason] - Raison complémentaire (affiché entre parenthèses)
    * @returns {void}
    */
   file(filePath, status, reason) {
     const def = FILE_STATUS[status] ?? FILE_STATUS.error;
-    const icon  = def.icon;
+    const icon = def.icon;
     const label = colorize(def.label, def.color, BOLD);
-    const path  = colorize(filePath, DIM);
-    const tail  = reason ? colorize(`  (${reason})`, FG_GRAY, DIM) : '';
+    const path = colorize(filePath, DIM);
+    const tail = reason ? colorize(`  (${reason})`, FG_GRAY, DIM) : "";
 
-    console.log(`  ${icon} ${label}  ${path}${tail}`);
+    logOut(`  ${icon} ${label}  ${path}${tail}`);
   },
 
   /**
@@ -162,21 +204,41 @@ export const logger = {
    * @returns {void}
    */
   summary(generationSummary) {
-    const { created = 0, skipped = 0, errors = 0, dryRun = 0, total = 0 } = generationSummary;
-    const sep      = separator(45);
+    const {
+      created = 0,
+      skipped = 0,
+      errors = 0,
+      dryRun = 0,
+      synced = 0,
+      total = 0,
+    } = generationSummary;
+    const sep = separator(45);
     const shortSep = separator(13);
 
-    console.log('');
-    console.log(colorize(sep, FG_BLUE, BOLD));
-    console.log(colorize('📊 Résumé de génération', BOLD));
-    console.log(colorize(sep, FG_BLUE, BOLD));
-    console.log(`  ${colorize('✅ Créés   ', FG_GREEN,  BOLD)} : ${colorize(String(created), FG_GREEN)}`);
-    console.log(`  ${colorize('⏭  Ignorés ', FG_YELLOW, BOLD)} : ${colorize(String(skipped), FG_YELLOW)}`);
-    console.log(`  ${colorize('🔍 Dry-run ', FG_CYAN,   BOLD)} : ${colorize(String(dryRun),  FG_CYAN)}`);
-    console.log(`  ${colorize('❌ Erreurs ', FG_RED,    BOLD)} : ${colorize(String(errors),  FG_RED)}`);
-    console.log(`  ${colorize(shortSep, FG_GRAY, DIM)}`);
-    console.log(`  ${colorize('📁 Total   ', BOLD)} : ${colorize(String(total), BOLD)}`);
-    console.log(colorize(sep, FG_BLUE, BOLD));
-    console.log('');
+    logOut("");
+    logOut(colorize(sep, FG_BLUE, BOLD));
+    logOut(colorize("📊 Résumé de génération", BOLD));
+    logOut(colorize(sep, FG_BLUE, BOLD));
+    logOut(
+      `  ${colorize("✅ Créés   ", FG_GREEN, BOLD)} : ${colorize(String(created), FG_GREEN)}`,
+    );
+    logOut(
+      `  ${colorize("⏭  Ignorés ", FG_YELLOW, BOLD)} : ${colorize(String(skipped), FG_YELLOW)}`,
+    );
+    logOut(
+      `  ${colorize("🔍 Dry-run ", FG_CYAN, BOLD)} : ${colorize(String(dryRun), FG_CYAN)}`,
+    );
+    logOut(
+      `  ${colorize("🔄 Sync    ", FG_CYAN, BOLD)} : ${colorize(String(synced ?? 0), FG_CYAN)}`,
+    );
+    logOut(
+      `  ${colorize("❌ Erreurs ", FG_RED, BOLD)} : ${colorize(String(errors), FG_RED)}`,
+    );
+    logOut(`  ${colorize(shortSep, FG_GRAY, DIM)}`);
+    logOut(
+      `  ${colorize("📁 Total   ", BOLD)} : ${colorize(String(total), BOLD)}`,
+    );
+    logOut(colorize(sep, FG_BLUE, BOLD));
+    logOut("");
   },
 };

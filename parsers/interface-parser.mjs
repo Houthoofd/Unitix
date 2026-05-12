@@ -6,9 +6,9 @@
  * @module parsers/interface-parser
  */
 
-import { parse }              from '@typescript-eslint/typescript-estree';
-import { readFile, access, readdir } from 'fs/promises';
-import path                   from 'path';
+import { parse } from "@typescript-eslint/typescript-estree";
+import { readFile, access, readdir } from "fs/promises";
+import path from "path";
 
 /** @import { InterfaceInfo, InterfaceMethod } from '../types.mjs' */
 
@@ -21,7 +21,7 @@ import path                   from 'path';
  * @returns {boolean}
  */
 function isNullKeyword(typeNode) {
-  return typeNode?.type === 'TSNullKeyword';
+  return typeNode?.type === "TSNullKeyword";
 }
 
 /**
@@ -32,11 +32,12 @@ function isNullKeyword(typeNode) {
  */
 function isArrayType(typeNode) {
   if (!typeNode) return false;
-  if (typeNode.type === 'TSArrayType') return true;
+  if (typeNode.type === "TSArrayType") return true;
   if (
-    typeNode.type === 'TSTypeReference' &&
-    typeNode.typeName?.name === 'Array'
-  ) return true;
+    typeNode.type === "TSTypeReference" &&
+    typeNode.typeName?.name === "Array"
+  )
+    return true;
   return false;
 }
 
@@ -50,67 +51,74 @@ function isArrayType(typeNode) {
 function analyzeReturnType(returnTypeAnnotation) {
   // Toutes les méthodes de repository retournent Promise → isAsync = true par convention
   const defaults = {
-    isAsync:         true,
-    returnsVoid:     false,
-    returnsBool:     false,
-    returnsArray:    false,
+    isAsync: true,
+    returnsVoid: false,
+    returnsBool: false,
+    returnsArray: false,
     returnsNullable: false,
-    mockReturn:      '{}',
+    mockReturn: "{}",
   };
 
   if (!returnTypeAnnotation) return defaults;
 
   // Le type de retour doit être TSTypeReference "Promise<T>"
-  const annotation = returnTypeAnnotation.typeAnnotation ?? returnTypeAnnotation;
+  const annotation =
+    returnTypeAnnotation.typeAnnotation ?? returnTypeAnnotation;
 
-  if (annotation?.type !== 'TSTypeReference' || annotation.typeName?.name !== 'Promise') {
+  if (
+    annotation?.type !== "TSTypeReference" ||
+    annotation.typeName?.name !== "Promise"
+  ) {
     return defaults;
   }
 
-  const innerType = annotation.typeParameters?.params?.[0];
+  // Support @typescript-eslint/typescript-estree v8 (typeArguments) et v7 (typeParameters)
+  const innerType = (annotation.typeArguments ?? annotation.typeParameters)
+    ?.params?.[0];
   if (!innerType) return defaults;
 
   // ── void ──────────────────────────────────────────────────────────────────
-  if (innerType.type === 'TSVoidKeyword') {
-    return { ...defaults, returnsVoid: true, mockReturn: 'undefined' };
+  if (innerType.type === "TSVoidKeyword") {
+    return { ...defaults, returnsVoid: true, mockReturn: "undefined" };
   }
 
   // ── boolean ───────────────────────────────────────────────────────────────
-  if (innerType.type === 'TSBooleanKeyword') {
-    return { ...defaults, returnsBool: true, mockReturn: 'false' };
+  if (innerType.type === "TSBooleanKeyword") {
+    return { ...defaults, returnsBool: true, mockReturn: "false" };
   }
 
   // ── array (T[] ou Array<T>) ───────────────────────────────────────────────
   if (isArrayType(innerType)) {
-    return { ...defaults, returnsArray: true, mockReturn: '[]' };
+    return { ...defaults, returnsArray: true, mockReturn: "[]" };
   }
 
   // ── union type (ex: T | null) ─────────────────────────────────────────────
-  if (innerType.type === 'TSUnionType') {
-    const hasNull  = innerType.types?.some(isNullKeyword) ?? false;
-    const hasArray = innerType.types?.some(isArrayType)   ?? false;
-    const hasBool  = innerType.types?.some((t) => t.type === 'TSBooleanKeyword') ?? false;
+  if (innerType.type === "TSUnionType") {
+    const hasNull = innerType.types?.some(isNullKeyword) ?? false;
+    const hasArray = innerType.types?.some(isArrayType) ?? false;
+    const hasBool =
+      innerType.types?.some((t) => t.type === "TSBooleanKeyword") ?? false;
 
     if (hasArray) {
       return {
         ...defaults,
-        returnsArray:    true,
+        returnsArray: true,
         returnsNullable: hasNull,
-        mockReturn:      hasNull ? 'null' : '[]',
+        mockReturn: hasNull ? "null" : "[]",
       };
     }
 
     if (hasBool) {
       return {
         ...defaults,
-        returnsBool:     true,
+        returnsBool: true,
         returnsNullable: hasNull,
-        mockReturn:      'false',
+        mockReturn: "false",
       };
     }
 
     if (hasNull) {
-      return { ...defaults, returnsNullable: true, mockReturn: 'null' };
+      return { ...defaults, returnsNullable: true, mockReturn: "null" };
     }
   }
 
@@ -130,9 +138,9 @@ function extractInterfaceMethods(ifaceNode) {
 
   for (const member of members) {
     // On ne traite que les signatures de méthodes
-    if (member.type !== 'TSMethodSignature') continue;
+    if (member.type !== "TSMethodSignature") continue;
 
-    const name = member.key?.name ?? member.key?.value ?? 'unknown';
+    const name = member.key?.name ?? member.key?.value ?? "unknown";
 
     const {
       isAsync,
@@ -167,20 +175,20 @@ function extractInterfaceMethods(ifaceNode) {
 function findRepositoryInterfaceNode(astBody) {
   for (const node of astBody) {
     // Cas 1 : interface directement dans le body (non exportée)
-    if (node.type === 'TSInterfaceDeclaration') {
-      const name = node.id?.name ?? '';
-      if (name.startsWith('I') && name.endsWith('Repository')) {
+    if (node.type === "TSInterfaceDeclaration") {
+      const name = node.id?.name ?? "";
+      if (name.startsWith("I") && name.endsWith("Repository")) {
         return node;
       }
     }
 
     // Cas 2 : export interface IXxxRepository { ... }
     if (
-      node.type === 'ExportNamedDeclaration' &&
-      node.declaration?.type === 'TSInterfaceDeclaration'
+      node.type === "ExportNamedDeclaration" &&
+      node.declaration?.type === "TSInterfaceDeclaration"
     ) {
-      const name = node.declaration.id?.name ?? '';
-      if (name.startsWith('I') && name.endsWith('Repository')) {
+      const name = node.declaration.id?.name ?? "";
+      if (name.startsWith("I") && name.endsWith("Repository")) {
         return node.declaration;
       }
     }
@@ -213,9 +221,11 @@ export async function parseInterface(filePath) {
   // ── Lecture du fichier ─────────────────────────────────────────────────────
   let code;
   try {
-    code = await readFile(filePath, 'utf-8');
+    code = await readFile(filePath, "utf-8");
   } catch (err) {
-    console.warn(`[interface-parser] Impossible de lire le fichier : ${filePath} — ${err.message}`);
+    console.warn(
+      `[interface-parser] Impossible de lire le fichier : ${filePath} — ${err.message}`,
+    );
     return null;
   }
 
@@ -224,7 +234,9 @@ export async function parseInterface(filePath) {
   try {
     ast = parse(code, { jsx: false, loc: true, range: true });
   } catch (err) {
-    console.warn(`[interface-parser] Erreur de parsing AST : ${filePath} — ${err.message}`);
+    console.warn(
+      `[interface-parser] Erreur de parsing AST : ${filePath} — ${err.message}`,
+    );
     return null;
   }
 
@@ -232,12 +244,14 @@ export async function parseInterface(filePath) {
   const ifaceNode = findRepositoryInterfaceNode(ast.body);
 
   if (!ifaceNode) {
-    console.warn(`[interface-parser] Aucune interface IXxxRepository trouvée dans : ${filePath}`);
+    console.warn(
+      `[interface-parser] Aucune interface IXxxRepository trouvée dans : ${filePath}`,
+    );
     return null;
   }
 
-  const interfaceName = ifaceNode.id?.name ?? path.basename(filePath, '.ts');
-  const methods       = extractInterfaceMethods(ifaceNode);
+  const interfaceName = ifaceNode.id?.name ?? path.basename(filePath, ".ts");
+  const methods = extractInterfaceMethods(ifaceNode);
 
   return {
     filePath,
@@ -260,7 +274,11 @@ export async function parseInterface(filePath) {
  * @param {string} useCaseFilePath - Chemin du fichier use-case (pour inférer le module)
  * @returns {Promise<string | null>} Chemin absolu du fichier ou `null` si introuvable
  */
-export async function findInterfaceFile(interfaceName, modulesDir, useCaseFilePath) {
+export async function findInterfaceFile(
+  interfaceName,
+  modulesDir,
+  useCaseFilePath,
+) {
   const fileName = `${interfaceName}.ts`;
 
   /**
@@ -279,12 +297,18 @@ export async function findInterfaceFile(interfaceName, modulesDir, useCaseFilePa
   }
 
   // ── Étape 1 : essai dans le module du use-case ────────────────────────────
-  const normalized   = useCaseFilePath.replace(/\\/g, '/');
-  const moduleMatch  = normalized.match(/modules\/([^/]+)\//);
+  const normalized = useCaseFilePath.replace(/\\/g, "/");
+  const moduleMatch = normalized.match(/modules\/([^/]+)\//);
 
   if (moduleMatch) {
     const moduleName = moduleMatch[1];
-    const candidate  = path.join(modulesDir, moduleName, 'domain', 'repositories', fileName);
+    const candidate = path.join(
+      modulesDir,
+      moduleName,
+      "domain",
+      "repositories",
+      fileName,
+    );
 
     if (await fileExists(candidate)) {
       return candidate;
@@ -296,20 +320,30 @@ export async function findInterfaceFile(interfaceName, modulesDir, useCaseFilePa
   try {
     entries = await readdir(modulesDir, { withFileTypes: true });
   } catch (err) {
-    console.warn(`[interface-parser] Impossible de lire le dossier modules : ${modulesDir} — ${err.message}`);
+    console.warn(
+      `[interface-parser] Impossible de lire le dossier modules : ${modulesDir} — ${err.message}`,
+    );
     return null;
   }
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const candidate = path.join(modulesDir, entry.name, 'domain', 'repositories', fileName);
+    const candidate = path.join(
+      modulesDir,
+      entry.name,
+      "domain",
+      "repositories",
+      fileName,
+    );
 
     if (await fileExists(candidate)) {
       return candidate;
     }
   }
 
-  console.warn(`[interface-parser] Interface "${interfaceName}" introuvable dans ${modulesDir}`);
+  console.warn(
+    `[interface-parser] Interface "${interfaceName}" introuvable dans ${modulesDir}`,
+  );
   return null;
 }

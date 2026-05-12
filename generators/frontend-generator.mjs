@@ -7,12 +7,14 @@
  * @module generators/frontend-generator
  */
 
-import { dirname, basename, join, relative } from 'path';
+import { dirname, basename, join, relative } from "path";
 
-import { parseComponent } from '../parsers/component-parser.mjs';
-import { parseHook }      from '../parsers/hook-parser.mjs';
-import { renderFrontendComponentTest } from '../templates/frontend-component.mjs';
-import { renderFrontendHookTest }      from '../templates/frontend-hook.mjs';
+import { computeFileHash } from "../hash-utils.mjs";
+
+import { parseComponent } from "../parsers/component-parser.mjs";
+import { parseHook } from "../parsers/hook-parser.mjs";
+import { renderFrontendComponentTest } from "../templates/frontend-component.mjs";
+import { renderFrontendHookTest } from "../templates/frontend-hook.mjs";
 
 /** @import { FrontendConfig, GeneratedTest } from '../types.mjs' */
 
@@ -28,9 +30,9 @@ import { renderFrontendHookTest }      from '../templates/frontend-hook.mjs';
  */
 function computeRelativePath(fromFile, toFile) {
   const fromDir = dirname(fromFile);
-  let rel = relative(fromDir, toFile).replace(/\\/g, '/');
-  rel = rel.replace(/\.(ts|tsx)$/, '');
-  if (!rel.startsWith('.')) rel = './' + rel;
+  let rel = relative(fromDir, toFile).replace(/\\/g, "/");
+  rel = rel.replace(/\.(ts|tsx)$/, "");
+  if (!rel.startsWith(".")) rel = "./" + rel;
   return rel;
 }
 
@@ -49,12 +51,18 @@ function computeRelativePath(fromFile, toFile) {
  */
 function buildMswHandlerPath(testFilePath, feature, featuresDir) {
   try {
-    const testDir     = dirname(testFilePath);
+    const testDir = dirname(testFilePath);
     // shared/ est au même niveau que features/
-    const sharedDir   = join(dirname(featuresDir), 'shared');
-    const handlerFile = join(sharedDir, 'test', 'mocks', 'handlers', `${feature}Handlers`);
-    let rel = relative(testDir, handlerFile).replace(/\\/g, '/');
-    if (!rel.startsWith('.')) rel = './' + rel;
+    const sharedDir = join(dirname(featuresDir), "shared");
+    const handlerFile = join(
+      sharedDir,
+      "test",
+      "mocks",
+      "handlers",
+      `${feature}Handlers`,
+    );
+    let rel = relative(testDir, handlerFile).replace(/\\/g, "/");
+    if (!rel.startsWith(".")) rel = "./" + rel;
     return rel;
   } catch {
     return null;
@@ -76,7 +84,7 @@ function buildMswHandlerPath(testFilePath, feature, featuresDir) {
  * @returns {Promise<GeneratedTest|null>} Contenu du test + chemin cible, ou null en cas d'échec
  */
 export async function generateFrontendTest(filePath, type, config) {
-  return type === 'component'
+  return type === "component"
     ? generateComponentTest(filePath, config)
     : generateHookTest(filePath, config);
 }
@@ -94,29 +102,40 @@ async function generateComponentTest(filePath, config) {
   try {
     componentInfo = await parseComponent(filePath);
   } catch (err) {
-    console.warn(`[frontend-generator] Erreur parsing composant : ${filePath} — ${err.message}`);
+    console.warn(
+      `[frontend-generator] Erreur parsing composant : ${filePath} — ${err.message}`,
+    );
     return null;
   }
   if (!componentInfo) return null;
 
   // Étape 2 — Chemins
-  const ext          = config.testFileExtension ?? '.test.tsx';
-  const testDir      = join(dirname(filePath), '__tests__');
-  const testFilePath = join(testDir, basename(filePath, '.tsx') + ext);
-  const importPath   = computeRelativePath(testFilePath, filePath);
+  const ext = config.testFileExtension ?? ".test.tsx";
+  const testDir = join(dirname(filePath), "__tests__");
+  const testFilePath = join(testDir, basename(filePath, ".tsx") + ext);
+  const importPath = computeRelativePath(testFilePath, filePath);
+
+  // Hash du fichier source pour la détection de désync
+  let sourceHash = null;
+  try {
+    sourceHash = await computeFileHash(filePath);
+  } catch {
+    /* non critique */
+  }
 
   // Étape 3 — Contexte template
   /** @type {import('../types.mjs').FrontendComponentTemplateContext} */
   const ctx = {
-    componentName:   componentInfo.componentName,
-    feature:         componentInfo.feature,
+    componentName: componentInfo.componentName,
+    feature: componentInfo.feature,
     importPath,
-    propsFields:     componentInfo.propsFields,
+    propsFields: componentInfo.propsFields,
     usesTranslation: componentInfo.usesTranslation,
-    usesRouter:      componentInfo.usesRouter,
-    usesQuery:       componentInfo.usesQuery,
-    testFramework:   config.testFramework ?? 'vitest',
-    renderHelper:    config.renderHelper ?? null,
+    usesRouter: componentInfo.usesRouter,
+    usesQuery: componentInfo.usesQuery,
+    testFramework: config.testFramework ?? "vitest",
+    renderHelper: config.renderHelper ?? null,
+    sourceHash: sourceHash ?? undefined,
   };
 
   // Étape 4 — Rendu
@@ -124,7 +143,9 @@ async function generateComponentTest(filePath, config) {
   try {
     content = renderFrontendComponentTest(ctx);
   } catch (err) {
-    console.warn(`[frontend-generator] Erreur rendu template composant : ${filePath} — ${err.message}`);
+    console.warn(
+      `[frontend-generator] Erreur rendu template composant : ${filePath} — ${err.message}`,
+    );
     return null;
   }
 
@@ -144,16 +165,26 @@ async function generateHookTest(filePath, config) {
   try {
     hookInfo = await parseHook(filePath);
   } catch (err) {
-    console.warn(`[frontend-generator] Erreur parsing hook : ${filePath} — ${err.message}`);
+    console.warn(
+      `[frontend-generator] Erreur parsing hook : ${filePath} — ${err.message}`,
+    );
     return null;
   }
   if (!hookInfo) return null;
 
   // Étape 2 — Chemins
-  const ext          = config.hookTestFileExtension ?? '.test.ts';
-  const testDir      = join(dirname(filePath), '__tests__');
-  const testFilePath = join(testDir, basename(filePath, '.ts') + ext);
-  const importPath   = computeRelativePath(testFilePath, filePath);
+  const ext = config.hookTestFileExtension ?? ".test.ts";
+  const testDir = join(dirname(filePath), "__tests__");
+  const testFilePath = join(testDir, basename(filePath, ".ts") + ext);
+  const importPath = computeRelativePath(testFilePath, filePath);
+
+  // Hash du fichier source pour la détection de désync
+  let sourceHash = null;
+  try {
+    sourceHash = await computeFileHash(filePath);
+  } catch {
+    /* non critique */
+  }
 
   // Étape 3 — Chemin MSW handlers (calculé uniquement si le hook utilise React Query)
   const mswHandlerImportPath =
@@ -164,14 +195,17 @@ async function generateHookTest(filePath, config) {
   // Étape 4 — Contexte template
   /** @type {import('../types.mjs').FrontendHookTemplateContext} */
   const ctx = {
-    hookNames:            hookInfo.hookNames,
-    feature:              hookInfo.feature,
+    hookNames: hookInfo.hookNames,
+    feature: hookInfo.feature,
     importPath,
-    usesQuery:            hookInfo.usesQuery,
-    usesMutation:         hookInfo.usesMutation,
-    queryKeyNames:        hookInfo.queryKeyNames,
-    testFramework:        config.testFramework ?? 'vitest',
+    usesQuery: hookInfo.usesQuery,
+    usesMutation: hookInfo.usesMutation,
+    queryKeyNames: hookInfo.queryKeyNames,
+    testFramework: config.testFramework ?? "vitest",
     mswHandlerImportPath,
+    renderHelper: config.renderHelper ?? null, // ← NOUVEAU
+    mutationPrefixes: config.mutationPrefixes ?? [], // ← NOUVEAU
+    sourceHash: sourceHash ?? undefined,
   };
 
   // Étape 5 — Rendu
@@ -179,7 +213,9 @@ async function generateHookTest(filePath, config) {
   try {
     content = renderFrontendHookTest(ctx);
   } catch (err) {
-    console.warn(`[frontend-generator] Erreur rendu template hook : ${filePath} — ${err.message}`);
+    console.warn(
+      `[frontend-generator] Erreur rendu template hook : ${filePath} — ${err.message}`,
+    );
     return null;
   }
 

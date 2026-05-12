@@ -1,15 +1,17 @@
 /**
  * @file index.mjs
- * @description Point d'entrée public de @clubmanager/test-generator.
+ * @description Point d'entrée public de @houthoofd/unitix.
  *
- * Quand ce package sera publié sur npm, les consommateurs importeront
- * uniquement depuis ce fichier :
+ * API publique :
  *
- *   import { generateTests } from '@clubmanager/test-generator';
+ *   import { generateTests }      from '@houthoofd/unitix'; // config manuelle
+ *   import { generateTestsAuto }  from '@houthoofd/unitix'; // détection auto
+ *   import { detectArchitecture } from '@houthoofd/unitix'; // détection seule
  *
  * Tout ce qui n'est pas exporté ici est un détail d'implémentation interne.
  *
- * @module @clubmanager/test-generator
+ * @module @houthoofd/unitix
  */
 
-export { generateTests } from './engine.mjs';
+export { generateTests, generateTestsAuto } from "./engine.mjs";
+export { detectArchitecture } from "./detectors/architecture-detector.mjs";

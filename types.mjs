@@ -42,6 +42,7 @@
  * @property {string}         [hookTestFileExtension] - Extension hook      (défaut: '.test.ts')
  * @property {{ name: string, importPath: string }} [renderHelper] - Wrapper de rendu custom
  * @property {string}         [setupFile]             - Chemin du fichier de setup Vitest
+ * @property {string[]}        [mutationPrefixes]      - Préfixes de hooks de mutation (ex: ['useCreate', 'useDelete'])
  */
 
 /**
@@ -94,6 +95,9 @@
  * @property {ExecuteParam[]}     executeParams          - Paramètres de execute()
  * @property {string}             returnType             - Type de retour (ex: 'AlertTypeDto', 'void')
  * @property {boolean}            isVoid                 - true si execute retourne Promise<void>
+ * @property {boolean}            returnsArray           - true si execute retourne un tableau (ex: Promise<AlertTypeDto[]>)
+ * @property {boolean}            returnsBool            - true si execute retourne un booléen (ex: Promise<boolean>)
+ * @property {string[]}           thrownExceptions       - Noms des exceptions lancées dans execute() (ex: ['NotFoundException', 'ForbiddenException'])
  * @property {string[]}           externalServiceImports - Chemins d'import des services externes
  *                                                         à mocker (ex: '@/shared/services/JwtService.js')
  */
@@ -169,6 +173,10 @@
  * @property {ExecuteParam[]}     executeParams        - Params de execute()
  * @property {string}             returnType           - Type de retour
  * @property {boolean}            isVoid               - true si execute retourne void
+ * @property {boolean}           [returnsArray]        - true si execute retourne un tableau
+ * @property {boolean}           [returnsBool]         - true si execute retourne un booléen
+ * @property {string[]}          [thrownExceptions]    - Exceptions détectées dans execute() (ex: ['NotFoundException'])
+ * @property {string}            [sourceHash]          - Hash SHA-256 court du fichier source (pour @unitix-source-hash)
  */
 
 /**
@@ -184,6 +192,7 @@
  * @property {boolean}  usesQuery        - Composant utilise React Query
  * @property {string}   testFramework    - 'vitest'
  * @property {{ name: string, importPath: string }|null} renderHelper - Wrapper de rendu
+ * @property {string}  [sourceHash]     - Hash SHA-256 court du fichier source
  */
 
 /**
@@ -198,6 +207,9 @@
  * @property {string[]} queryKeyNames      - Noms des query key exports
  * @property {string}   testFramework      - 'vitest'
  * @property {string|null} mswHandlerImportPath - Chemin import du handler MSW si applicable
+ * @property {{ name: string, importPath: string }|null} renderHelper - Wrapper de rendu custom (comme FrontendComponentTemplateContext)
+ * @property {string[]} [mutationPrefixes]  - Préfixes de hooks de mutation (configurable)
+ * @property {string}   [sourceHash]        - Hash SHA-256 court du fichier source
  */
 
 // ─── Résultats & Résumé ───────────────────────────────────────────────────────
@@ -206,7 +218,7 @@
  * Résultat de la génération d'un fichier de test
  *
  * @typedef {Object} GenerationResult
- * @property {'created'|'skipped'|'dry-run'|'error'} status - Statut de l'opération
+ * @property {'created'|'skipped'|'dry-run'|'error'|'synced'} status - Statut de l'opération
  * @property {string}  testFilePath   - Chemin du fichier de test (cible)
  * @property {string}  sourceFilePath - Chemin du fichier source
  * @property {string} [reason]        - Raison du skip ou du message d'erreur
@@ -221,7 +233,144 @@
  * @property {number}             skipped - Fichiers ignorés (déjà existants)
  * @property {number}             errors  - Fichiers en erreur
  * @property {number}             dryRun  - Fichiers qui auraient été créés (dry-run)
+ * @property {number}             synced  - Fichiers resynchronisés (hash changé → régénérés)
  * @property {number}             total   - Total traité
+ */
+
+// ─── Détection d'architecture ───────────────────────────────────────────────
+
+/**
+ * Types d'architectures détectables par Unitix.
+ *
+ * @typedef {'clean-architecture'|'feature-based'|'mvc-layered'|'nextjs'|'monorepo'|'unknown'} ArchitectureType
+ */
+
+/**
+ * Frameworks et outils détectés dans le projet.
+ *
+ * @typedef {Object} FrameworkInfo
+ * @property {'typescript'|'javascript'} language          - Langage principal du projet
+ * @property {'nestjs'|'express'|'fastify'|'koa'|null} backend  - Framework backend détecté
+ * @property {'react'|'vue'|'angular'|'svelte'|null}   frontend - Framework frontend détecté
+ * @property {'jest'|'vitest'|null}                    testRunner - Runner de tests détecté
+ * @property {'vite'|'webpack'|'esbuild'|null}         bundler    - Bundler détecté
+ * @property {boolean}                                 isMonorepo - Projet monorepo
+ * @property {boolean}                                 isNextJs   - Projet Next.js
+ */
+
+/**
+ * Chemins bruts relevés lors du scan de dossiers.
+ * Usage interne au détecteur — ne pas exposer à l'API publique.
+ *
+ * @typedef {Object} RawDetectedPaths
+ * @property {string|null} srcDir
+ * @property {string|null} backendDir
+ * @property {string|null} frontendDir
+ * @property {string|null} modulesDir
+ * @property {string|null} featuresDir
+ * @property {string|null} controllersDir
+ * @property {string|null} servicesDir
+ * @property {string|null} pagesDir
+ * @property {string|null} appRouterDir
+ * @property {string|null} packagesDir
+ * @property {string|null} appsDir
+ * @property {string|null} testsDir
+ * @property {boolean}     hasUseCasesDir
+ * @property {boolean}     hasDomainDir
+ * @property {boolean}     hasNestCliJson
+ * @property {boolean}     hasNextConfig
+ * @property {boolean}     hasViteConfig
+ * @property {boolean}     hasAngularJson
+ * @property {boolean}     hasJestConfig
+ * @property {boolean}     hasVitestConfig
+ */
+
+/**
+ * Chemins résolus (absolus) par le détecteur d'architecture.
+ *
+ * @typedef {Object} DetectedPaths
+ * @property {string}      root           - Racine du projet
+ * @property {string|null} src            - Dossier src/ s'il existe
+ * @property {string|null} backend        - Dossier backend/ (ou server/, api/)
+ * @property {string|null} frontend       - Dossier frontend/ (ou client/, web/)
+ * @property {string|null} modulesDir     - Racine des modules (clean-arch)
+ * @property {string|null} featuresDir    - Racine des features (feature-based)
+ * @property {string|null} controllersDir - Dossier controllers/ (mvc)
+ * @property {string|null} servicesDir    - Dossier services/ (mvc)
+ * @property {string|null} pagesDir       - Dossier pages/ ou app/ (nextjs)
+ * @property {string|null} testsDir       - Dossier tests/ racine (s'il existe déjà)
+ */
+
+/**
+ * Règle de génération de tests pour un type de source donné.
+ *
+ * @typedef {Object} TestRule
+ * @property {string}            name          - Identifiant de la règle (ex: 'use-cases')
+ * @property {string}            description   - Description lisible
+ * @property {string}            sourcePattern - Glob relatif pour trouver les sources
+ * @property {'colocated'|'root-tests-dir'|'mirror'} testPlacement - Emplacement des tests
+ * @property {string}            testDirName   - Nom du dossier de tests ('__tests__' ou 'tests')
+ * @property {string}           [testSubDir]   - Sous-dossier dans testDirName (ex: 'controllers')
+ * @property {string}            testNaming    - Convention de nommage (ex: '{name}.test.ts')
+ * @property {'jest'|'vitest'}   framework     - Framework de test à utiliser
+ * @property {string}            template      - Nom du template à utiliser
+ * @property {'backend'|'frontend'|'all'} workspace - Workspace ciblé
+ */
+
+/**
+ * Stratégie de tests adaptée à l'architecture du projet.
+ *
+ * @typedef {Object} TestStrategy
+ * @property {'colocated'|'root-tests-dir'|'mirror'} placement - Stratégie d'emplacement par défaut
+ * @property {string}    testDirName  - Nom du dossier de tests ('__tests__' ou 'tests')
+ * @property {'test'|'spec'} fileNaming - Convention de nommage (*.test.ts ou *.spec.ts)
+ * @property {TestRule[]} rules        - Règles de génération par type de source
+ */
+
+/**
+ * Entrée de la cartographie source↔test pour un répertoire source donné.
+ *
+ * @typedef {Object} SourceDirEntry
+ * @property {string}   sourceDir           - Chemin absolu du répertoire source
+ * @property {string}   sourceDirRelative   - Chemin relatif à la racine (affichage)
+ * @property {string}   module              - Nom du module/feature parent
+ * @property {string}   ruleName            - Règle applicable ('use-cases'|'components'|'hooks'|...)
+ * @property {'backend'|'frontend'|'all'} workspace - Workspace concerné
+ * @property {string}   testDir             - Chemin absolu du répertoire de tests cible
+ * @property {string}   testDirRelative     - Chemin relatif du répertoire de tests (affichage)
+ * @property {boolean}  testDirExists       - true si le répertoire de tests existe déjà
+ * @property {string[]} sourceFiles         - Noms des fichiers sources dans ce répertoire
+ * @property {number}   existingTestCount   - Nombre de fichiers de test déjà présents
+ * @property {number}   missingTestCount    - Nombre de tests manquants (à créer)
+ * @property {number}   desyncCount         - Nombre de fichiers source désynchronisés (stub modifié)
+ * @property {string[]} desyncFiles         - Noms des fichiers source dont le stub est désynchronisé
+ */
+
+/**
+ * Statistiques agrégées de la SourceMap.
+ *
+ * @typedef {Object} SourceMapStats
+ * @property {number} totalDirs          - Nombre total de répertoires sources trouvés
+ * @property {number} totalSourceFiles   - Nombre total de fichiers sources
+ * @property {number} totalTestsExisting - Nombre de tests déjà créés
+ * @property {number} totalTestsMissing  - Nombre de tests à créer
+ * @property {number} totalDesync        - Nombre total de stubs désynchronisés dans le projet
+ * @property {number} coveragePercent    - % de couverture actuelle (0–100)
+ */
+
+/**
+ * Profil complet d'architecture d'un projet, retourné par detectArchitecture().
+ *
+ * @typedef {Object} ArchitectureProfile
+ * @property {ArchitectureType}  type        - Type d'architecture détecté
+ * @property {'high'|'medium'|'low'} confidence - Niveau de confiance de la détection
+ * @property {FrameworkInfo}     frameworks  - Frameworks et outils détectés
+ * @property {DetectedPaths}     paths       - Chemins clés résolus
+ * @property {TestStrategy}      testStrategy - Stratégie de tests adaptée
+ * @property {SourceDirEntry[]}  sourceMap   - Cartographie complète sources↔tests
+ * @property {SourceMapStats}    sourceMapStats - Statistiques agrégées
+ * @property {number}            score       - Score brut de détection (debug)
+ * @property {Record<string,number>} allScores - Scores de tous les types (debug)
  */
 
 // Ce fichier est purement documentaire — pas d'implémentation.

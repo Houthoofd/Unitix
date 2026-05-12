@@ -24,11 +24,11 @@
  * @returns {string}
  */
 function indent(str, n) {
-  const pad = ' '.repeat(n);
+  const pad = " ".repeat(n);
   return str
-    .split('\n')
-    .map(line => (line.trim() === '' ? '' : pad + line))
-    .join('\n');
+    .split("\n")
+    .map((line) => (line.trim() === "" ? "" : pad + line))
+    .join("\n");
 }
 
 /**
@@ -39,30 +39,36 @@ function indent(str, n) {
  *   - Commence par 'useCreate', 'useUpdate', 'useDelete', 'useAdd',
  *     'useRemove', 'useResolve', 'useIgnore', 'useSend', 'useSet'
  *
- * @param {string} hookName - Nom du hook (ex: 'useCreateAlertType')
+ * Si `prefixes` est fourni et non vide, il remplace la liste par défaut.
+ *
+ * @param {string}   hookName - Nom du hook (ex: 'useCreateAlertType')
+ * @param {string[]?} prefixes - Préfixes de mutation (depuis config, optionnel)
  * @returns {boolean}
  */
-function isMutationHook(hookName) {
-  const MUTATION_PREFIXES = [
-    'useCreate',
-    'useUpdate',
-    'useDelete',
-    'useAdd',
-    'useRemove',
-    'useResolve',
-    'useIgnore',
-    'useSend',
-    'useSet',
-    'useToggle',
-    'useUpload',
-    'useSubmit',
-    'useReset',
-    'useCancel',
-    'useConfirm',
-    'useAssign',
-    'useUnassign',
-  ];
-  return MUTATION_PREFIXES.some(prefix => hookName.startsWith(prefix));
+function isMutationHook(hookName, prefixes) {
+  const MUTATION_PREFIXES =
+    prefixes && prefixes.length > 0
+      ? prefixes
+      : [
+          "useCreate",
+          "useUpdate",
+          "useDelete",
+          "useAdd",
+          "useRemove",
+          "useResolve",
+          "useIgnore",
+          "useSend",
+          "useSet",
+          "useToggle",
+          "useUpload",
+          "useSubmit",
+          "useReset",
+          "useCancel",
+          "useConfirm",
+          "useAssign",
+          "useUnassign",
+        ];
+  return MUTATION_PREFIXES.some((prefix) => hookName.startsWith(prefix));
 }
 
 /**
@@ -80,13 +86,13 @@ function isMutationHook(hookName) {
  */
 function deriveEndpointHint(hookName, feature) {
   const lower = hookName.toLowerCase();
-  if (lower.startsWith('usecreate') || lower.startsWith('useadd')) {
+  if (lower.startsWith("usecreate") || lower.startsWith("useadd")) {
     return `POST /api/${feature}/...`;
   }
-  if (lower.startsWith('useupdate')) {
+  if (lower.startsWith("useupdate")) {
     return `PUT /api/${feature}/.../:id`;
   }
-  if (lower.startsWith('usedelete') || lower.startsWith('useremove')) {
+  if (lower.startsWith("usedelete") || lower.startsWith("useremove")) {
     return `DELETE /api/${feature}/.../:id`;
   }
   // Cas useQuery par défaut
@@ -107,17 +113,19 @@ function renderHeader(ctx, primaryHookName) {
     `/**`,
     ` * ${primaryHookName}.test.ts`,
     ` * Tests hooks — ${ctx.feature} / ${primaryHookName}`,
-    ` * ${'─'.repeat(77)}`,
-    ` * Généré par : scripts/generate-tests.mjs`,
-    ` * Sprint     : Tests 2 — Hooks Frontend`,
+    ` * ${"─".repeat(77)}`,
+    ` * G\u00e9n\u00e9r\u00e9 par : Unitix v0.4.1`,
     ` * Feature    : ${ctx.feature}`,
     ` */`,
   ];
-  return lines.join('\n');
+  if (ctx.sourceHash) {
+    lines.push(`// @unitix-source-hash: ${ctx.sourceHash}`);
+  }
+  return lines.join("\n");
 }
 
 /**
- * Génère les imports du fichier de test de hooks.
+ * G\u00e9n\u00e8re les imports du fichier de test de hooks.
  *
  * Imports Vitest :
  *   - Toujours : describe, it, expect, beforeAll, afterAll, afterEach
@@ -135,24 +143,29 @@ function renderImports(ctx) {
 
   // ── Imports Vitest ────────────────────────────────────────────────────────
   lines.push(
-    `import { describe, it, expect, beforeAll, afterAll, afterEach } from '${ctx.testFramework}';`
+    `import { describe, it, expect, beforeAll, afterAll, afterEach } from '${ctx.testFramework}';`,
   );
 
   // ── Imports React Testing Library ──────────────────────────────────────────
   lines.push(`import { renderHook, waitFor } from '@testing-library/react';`);
 
   // ── Import du wrapper de rendu ─────────────────────────────────────────────
-  // Utilisé comme `wrapper` option de renderHook
-  lines.push(`import { renderWithProviders } from '@/shared/test/renderWithProviders';`);
+  // Import du wrapper de rendu (depuis config ou fallback hardcodé)
+  if (ctx.renderHelper) {
+    lines.push(
+      `import { ${ctx.renderHelper.name} } from '${ctx.renderHelper.importPath}';`,
+    );
+  } else {
+    lines.push(
+      `import { renderWithProviders } from '@/shared/test/renderWithProviders';`,
+    );
+  }
 
   // ── Import des hooks et query keys depuis le fichier source ───────────────
-  const namedImports = [
-    ...ctx.hookNames,
-    ...ctx.queryKeyNames,
-  ];
-  lines.push(`import { ${namedImports.join(', ')} } from '${ctx.importPath}';`);
+  const namedImports = [...ctx.hookNames, ...ctx.queryKeyNames];
+  lines.push(`import { ${namedImports.join(", ")} } from '${ctx.importPath}';`);
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -163,7 +176,7 @@ function renderImports(ctx) {
  */
 function renderMswBlock(ctx) {
   const lines = [
-    `// ${'─'.repeat(3)} MSW Server ${'─'.repeat(49)}`,
+    `// ${"─".repeat(3)} MSW Server ${"─".repeat(49)}`,
     `// TODO: Décommenter quand le serveur MSW est configuré (Sprint Tests 2a)`,
   ];
 
@@ -179,18 +192,23 @@ function renderMswBlock(ctx) {
     `// afterAll(() => server.close());`,
   );
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
  * Génère le bloc `describe` pour un hook de type useQuery.
  * Contient 1 cas de test : chargement/succès.
  *
- * @param {string} hookName - Nom du hook (ex: 'useAlertTypes')
- * @param {string} feature  - Feature parente
+ * @param {string} hookName         - Nom du hook (ex: 'useAlertTypes')
+ * @param {string} feature          - Feature parente
+ * @param {string} [renderHelperName='renderWithProviders'] - Nom du helper de rendu
  * @returns {string}
  */
-function renderQueryDescribe(hookName, feature) {
+function renderQueryDescribe(
+  hookName,
+  feature,
+  renderHelperName = "renderWithProviders",
+) {
   const endpoint = deriveEndpointHint(hookName, feature);
 
   const lines = [
@@ -198,7 +216,7 @@ function renderQueryDescribe(hookName, feature) {
     `  it('devrait retourner les données en état de chargement puis succès', async () => {`,
     `    // TODO: configurer MSW pour intercepter ${endpoint}`,
     `    // const { result } = renderHook(() => ${hookName}(), {`,
-    `    //   wrapper: renderWithProviders,`,
+    `    //   wrapper: ${renderHelperName},`,
     `    // });`,
     `    // await waitFor(() => expect(result.current.isSuccess).toBe(true));`,
     `    // expect(result.current.data).toBeDefined();`,
@@ -207,18 +225,23 @@ function renderQueryDescribe(hookName, feature) {
     `});`,
   ];
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
  * Génère le bloc `describe` pour un hook de type useMutation.
  * Contient 2 cas de test : succès + erreur API.
  *
- * @param {string} hookName - Nom du hook (ex: 'useCreateAlertType')
- * @param {string} feature  - Feature parente
+ * @param {string} hookName         - Nom du hook (ex: 'useCreateAlertType')
+ * @param {string} feature          - Feature parente
+ * @param {string} [renderHelperName='renderWithProviders'] - Nom du helper de rendu
  * @returns {string}
  */
-function renderMutationDescribe(hookName, feature) {
+function renderMutationDescribe(
+  hookName,
+  feature,
+  renderHelperName = "renderWithProviders",
+) {
   const endpoint = deriveEndpointHint(hookName, feature);
 
   const lines = [
@@ -226,7 +249,7 @@ function renderMutationDescribe(hookName, feature) {
     `  it('devrait appeler la mutation et invalider le cache en cas de succès', async () => {`,
     `    // TODO: configurer MSW pour intercepter ${endpoint}`,
     `    // const { result } = renderHook(() => ${hookName}(), {`,
-    `    //   wrapper: renderWithProviders,`,
+    `    //   wrapper: ${renderHelperName},`,
     `    // });`,
     `    // await act(async () => { result.current.mutate({ /* TODO: payload */ }); });`,
     `    // await waitFor(() => expect(result.current.isSuccess).toBe(true));`,
@@ -235,12 +258,12 @@ function renderMutationDescribe(hookName, feature) {
     ``,
     `  it("devrait exposer l'erreur en cas d'échec API", async () => {`,
     `    // TODO: server.use(`,
-    `    //   http.${endpoint.split(' ')[0].toLowerCase()}('${endpoint.split(' ')[1]}',`,
+    `    //   http.${endpoint.split(" ")[0].toLowerCase()}('${endpoint.split(" ")[1]}',`,
     `    //     () => HttpResponse.error()`,
     `    //   )`,
     `    // )`,
     `    // const { result } = renderHook(() => ${hookName}(), {`,
-    `    //   wrapper: renderWithProviders,`,
+    `    //   wrapper: ${renderHelperName},`,
     `    // });`,
     `    // await act(async () => { result.current.mutate({ /* TODO: payload */ }); });`,
     `    // await waitFor(() => expect(result.current.isError).toBe(true));`,
@@ -249,21 +272,28 @@ function renderMutationDescribe(hookName, feature) {
     `});`,
   ];
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
  * Génère le bloc `describe` adapté pour un hook (query ou mutation).
  *
- * @param {string} hookName - Nom du hook
- * @param {string} feature  - Feature parente
+ * @param {string}   hookName         - Nom du hook
+ * @param {string}   feature          - Feature parente
+ * @param {string}   [renderHelperName='renderWithProviders'] - Nom du helper de rendu
+ * @param {string[]?} prefixes        - Préfixes de mutation (depuis config, optionnel)
  * @returns {string}
  */
-function renderHookDescribe(hookName, feature) {
-  if (isMutationHook(hookName)) {
-    return renderMutationDescribe(hookName, feature);
+function renderHookDescribe(
+  hookName,
+  feature,
+  renderHelperName = "renderWithProviders",
+  prefixes,
+) {
+  if (isMutationHook(hookName, prefixes)) {
+    return renderMutationDescribe(hookName, feature, renderHelperName);
   }
-  return renderQueryDescribe(hookName, feature);
+  return renderQueryDescribe(hookName, feature, renderHelperName);
 }
 
 // ─── Export principal ─────────────────────────────────────────────────────────
@@ -296,25 +326,31 @@ function renderHookDescribe(hookName, feature) {
  */
 export function renderFrontendHookTest(ctx) {
   // Validation défensive du contexte
-  if (!ctx || typeof ctx !== 'object') {
-    throw new TypeError('[renderFrontendHookTest] ctx doit être un objet non-null');
+  if (!ctx || typeof ctx !== "object") {
+    throw new TypeError(
+      "[renderFrontendHookTest] ctx doit être un objet non-null",
+    );
   }
   if (!Array.isArray(ctx.hookNames) || ctx.hookNames.length === 0) {
-    throw new TypeError('[renderFrontendHookTest] ctx.hookNames doit être un tableau non vide');
+    throw new TypeError(
+      "[renderFrontendHookTest] ctx.hookNames doit être un tableau non vide",
+    );
   }
   if (!ctx.importPath) {
-    throw new TypeError('[renderFrontendHookTest] ctx.importPath est requis');
+    throw new TypeError("[renderFrontendHookTest] ctx.importPath est requis");
   }
 
   // Normalisation des champs optionnels
   const safeCtx = {
     ...ctx,
-    feature:              ctx.feature              ?? 'shared',
-    usesQuery:            ctx.usesQuery             ?? false,
-    usesMutation:         ctx.usesMutation          ?? false,
-    queryKeyNames:        ctx.queryKeyNames         ?? [],
-    testFramework:        ctx.testFramework         ?? 'vitest',
-    mswHandlerImportPath: ctx.mswHandlerImportPath  ?? null,
+    feature: ctx.feature ?? "shared",
+    usesQuery: ctx.usesQuery ?? false,
+    usesMutation: ctx.usesMutation ?? false,
+    queryKeyNames: ctx.queryKeyNames ?? [],
+    testFramework: ctx.testFramework ?? "vitest",
+    mswHandlerImportPath: ctx.mswHandlerImportPath ?? null,
+    renderHelper: ctx.renderHelper ?? null,
+    mutationPrefixes: ctx.mutationPrefixes ?? [],
   };
 
   // Le nom du "fichier de test" est basé sur le premier hook de la liste
@@ -323,27 +359,46 @@ export function renderFrontendHookTest(ctx) {
   // ── Construction des sections ─────────────────────────────────────────────
   const sections = [
     renderHeader(safeCtx, primaryHookName),
-    '',
+    "",
+    "// @unitix:begin",
+    "",
     renderImports(safeCtx),
-    '',
+    "",
     renderMswBlock(safeCtx),
-    '',
-    `// ${'─'.repeat(3)} Tests ${'─'.repeat(52)}`,
-    '',
+    "",
+    `// ${"─".repeat(3)} Tests ${"─".repeat(52)}`,
+    "",
   ];
+
+  // Détermine le nom du helper de rendu à utiliser dans les commentaires
+  const renderHelperName = safeCtx.renderHelper?.name ?? "renderWithProviders";
 
   // Un describe par hook dans l'ordre déclaré
   for (let i = 0; i < safeCtx.hookNames.length; i++) {
     const hookName = safeCtx.hookNames[i];
-    sections.push(renderHookDescribe(hookName, safeCtx.feature));
+    sections.push(
+      renderHookDescribe(
+        hookName,
+        safeCtx.feature,
+        renderHelperName,
+        safeCtx.mutationPrefixes,
+      ),
+    );
 
     // Ligne vide entre les describes (sauf après le dernier)
     if (i < safeCtx.hookNames.length - 1) {
-      sections.push('');
+      sections.push("");
     }
   }
 
-  sections.push(''); // newline final
+  sections.push("// @unitix:end");
+  sections.push("");
+  sections.push(`// ${"─".repeat(3)} Tests personnalisés ${"─".repeat(39)}`);
+  sections.push(
+    `// Les blocs ci-dessous sont préservés lors d'un \`unitix --sync\`.`,
+  );
+  sections.push(`// Ajoutez ici vos tests supplémentaires pour ces hooks.`);
+  sections.push("");
 
-  return sections.join('\n');
+  return sections.join("\n");
 }

@@ -1,41 +1,327 @@
 #!/usr/bin/env node
 /**
- * bin/unitix.mjs
+ * bin/unitix
  * ─────────────────────────────────────────────────────────────────────────────
  * CLI binary de Unitix.
  *
- * Cherche la config dans cet ordre :
+ * Modes d'exécution :
+ *   --detect   Analyse l'architecture du projet et affiche le profil détecté
+ *              (aucune génération de tests)
+ *   --auto     Détecte l'architecture et génère les tests automatiquement
+ *              (sans fichier de config requis)
+ *   (default)  Charge un fichier de config et génère les tests manuellement
+ *
+ * Résolution de la config (mode default) :
  *   1. --config=./chemin/vers/config.mjs
  *   2. unitix.config.mjs dans le CWD
  *   3. generate-tests.config.mjs dans le CWD
  *
  * Usage :
+ *   npx unitix --detect
+ *   npx unitix --auto [options]
  *   npx unitix [options]
  *   npx unitix --help
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { parseArgs, printHelp } from '../cli.mjs';
-import { generateTests }        from '../engine.mjs';
-import { resolve }              from 'path';
+import { parseArgs, printHelp } from "../cli.mjs";
+import { generateTests, generateTestsAuto } from "../engine.mjs";
+import { detectArchitecture } from "../detectors/architecture-detector.mjs";
+import { logger, setQuiet, setNoColor } from "../logger.mjs";
+import { resolve } from "path";
 
 const options = parseArgs(process.argv.slice(2));
+
+// Mode JSON : rediriger les logs vers stderr pour garder stdout propre
+if (options.json) setQuiet(true);
+
+// Mode sans couleur : désactiver tous les codes ANSI
+if (options.noColor) setNoColor(true);
 
 if (options.help) {
   printHelp();
   process.exit(0);
 }
 
-// ─── Résolution de la config ──────────────────────────────────────────────────
+// ─── Helpers d'affichage ──────────────────────────────────────────────────────
 
-// Support du flag --config=./path/to/config.mjs
-const configFlagArg = process.argv.find(a => a.startsWith('--config='));
-const configFlagPath = configFlagArg ? resolve(process.cwd(), configFlagArg.slice(9)) : null;
+/**
+ * Construit une barre de progression ASCII.
+ *
+ * @param {number} percent  - Valeur 0-100
+ * @param {number} width    - Largeur en caractères
+ * @returns {string}
+ */
+function buildProgressBar(percent, width) {
+  const filled = Math.round((percent / 100) * width);
+  const empty = width - filled;
+  if (options.noColor) {
+    return "[" + "#".repeat(filled) + "-".repeat(empty) + "]";
+  }
+  return (
+    "\x1b[32m" + "█".repeat(filled) + "\x1b[2m" + "░".repeat(empty) + "\x1b[0m"
+  );
+}
+
+/**
+ * Formate et affiche un ArchitectureProfile dans le terminal.
+ *
+ * @param {import('../types.mjs').ArchitectureProfile} profile
+ */
+function printProfile(profile) {
+  const C = options.noColor
+    ? { bold: "", cyan: "", green: "", yellow: "", gray: "", reset: "" }
+    : {
+        bold: "\x1b[1m",
+        cyan: "\x1b[36m",
+        green: "\x1b[32m",
+        yellow: "\x1b[33m",
+        gray: "\x1b[2m",
+        reset: "\x1b[0m",
+      };
+
+  const confidenceColor =
+    {
+      high: C.green,
+      medium: C.yellow,
+      low: C.yellow,
+    }[profile.confidence] ?? C.gray;
+
+  console.log("");
+  console.log(`  ${C.bold}${C.cyan}Unitix — Analyse d'architecture${C.reset}`);
+  console.log(`  ${"─".repeat(50)}`);
+  console.log(
+    `  ${C.bold}Type        :${C.reset} ${C.cyan}${profile.type}${C.reset}`,
+  );
+  console.log(
+    `  ${C.bold}Confiance   :${C.reset} ${confidenceColor}${profile.confidence}${C.reset} ${C.gray}(score: ${profile.score})${C.reset}`,
+  );
+  console.log("");
+
+  // Frameworks
+  const fw = profile.frameworks;
+  console.log(`  ${C.bold}Frameworks  :${C.reset}`);
+  console.log(`    Langage      : ${fw.language}`);
+  if (fw.backend) console.log(`    Backend      : ${fw.backend}`);
+  if (fw.frontend) console.log(`    Frontend     : ${fw.frontend}`);
+  if (fw.testRunner) console.log(`    Test runner  : ${fw.testRunner}`);
+  if (fw.bundler) console.log(`    Bundler      : ${fw.bundler}`);
+  if (fw.isMonorepo) console.log(`    Monorepo     : oui`);
+  if (fw.isNextJs) console.log(`    Next.js      : oui`);
+  console.log("");
+
+  // Chemins détectés
+  const paths = profile.paths;
+  console.log(`  ${C.bold}Chemins détectés :${C.reset}`);
+  for (const [key, val] of Object.entries(paths)) {
+    if (val && key !== "root") {
+      const rel = val.replace(paths.root, "").replace(/^[\\/]/, "");
+      console.log(`    ${key.padEnd(16)}: ${C.gray}${rel}${C.reset}`);
+    }
+  }
+  console.log("");
+
+  // Stratégie de tests
+  const strat = profile.testStrategy;
+  console.log(`  ${C.bold}Stratégie de tests :${C.reset}`);
+  console.log(`    Placement  : ${strat.placement} (${strat.testDirName}/)`);
+  console.log(`    Nommage    : *.${strat.fileNaming}.ts`);
+  console.log(`    Règles     :`);
+  for (const rule of strat.rules) {
+    console.log(
+      `      ${C.cyan}${rule.name}${C.reset} ${C.gray}[${rule.framework}]${C.reset} — ${rule.description}`,
+    );
+    console.log(`        source  : ${rule.sourcePattern}`);
+    console.log(`        test    : ${rule.testDirName}/${rule.testNaming}`);
+  }
+  console.log("");
+
+  // Scores (debug)
+  console.log(
+    `  ${C.gray}Scores : ${Object.entries(profile.allScores)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("  ")}${C.reset}`,
+  );
+  console.log("");
+
+  // Source map
+  if (profile.sourceMap && profile.sourceMap.length > 0) {
+    const stats = profile.sourceMapStats;
+    const coverageBar = buildProgressBar(stats.coveragePercent, 20);
+    console.log(`  ${C.bold}Cartographie sources \u2194 tests :${C.reset}`);
+
+    const desyncNote =
+      (stats.totalDesync ?? 0) > 0
+        ? `  ${C.yellow}\u26a0 ${stats.totalDesync} d\u00e9sync${C.reset}`
+        : "";
+
+    console.log(
+      `  Couverture : ${coverageBar} ${stats.coveragePercent}%  ` +
+        `${C.green}${stats.totalTestsExisting} existants${C.reset}  ` +
+        `${stats.totalTestsMissing > 0 ? C.yellow : C.green}${stats.totalTestsMissing} \u00e0 cr\u00e9er${C.reset}` +
+        desyncNote +
+        `  ${C.gray}(${stats.totalSourceFiles} sources, ${stats.totalDirs} dossiers)${C.reset}`,
+    );
+    console.log("");
+
+    // Grouper par workspace puis par module
+    const byWorkspace = {};
+    for (const entry of profile.sourceMap) {
+      const ws = entry.workspace;
+      if (!byWorkspace[ws]) byWorkspace[ws] = {};
+      if (!byWorkspace[ws][entry.module]) byWorkspace[ws][entry.module] = [];
+      byWorkspace[ws][entry.module].push(entry);
+    }
+
+    for (const [ws, modules] of Object.entries(byWorkspace)) {
+      console.log(`  ${C.bold}[${ws}]${C.reset}`);
+      for (const [mod, entries] of Object.entries(modules)) {
+        console.log(`    ${C.cyan}${mod}${C.reset}`);
+        for (const entry of entries) {
+          const desyncSuffix =
+            (entry.desyncCount ?? 0) > 0
+              ? `  ${C.yellow}\u26a0 ${entry.desyncCount} d\u00e9sync${C.reset}`
+              : "";
+
+          const status = entry.testDirExists
+            ? entry.missingTestCount === 0
+              ? `${C.green}\u2713 complet${C.reset}${desyncSuffix}`
+              : `${C.yellow}\u25cb ${entry.existingTestCount}/${entry.sourceFiles.length}${C.reset}${desyncSuffix}`
+            : `${C.gray}\u25a1 absent${C.reset}`;
+          const srcRel = entry.sourceDirRelative.split("/").slice(-2).join("/");
+          console.log(
+            `      ${status}  ${C.gray}${srcRel}${C.reset}` +
+              `  ${C.gray}(${entry.sourceFiles.length} src)${C.reset}` +
+              `  \u2192  ${entry.testDirRelative}`,
+          );
+        }
+      }
+      console.log("");
+    }
+  }
+}
+
+// ─── Mode : --detect ─────────────────────────────────────────────────────────────
+
+if (options.detect) {
+  try {
+    const profile = await detectArchitecture(resolve(process.cwd()));
+
+    // Mode JSON : sortie machine-readable sur stdout
+    if (options.json) {
+      process.stdout.write(JSON.stringify(profile, null, 2) + "\n");
+    } else {
+      printProfile(profile);
+    }
+
+    // Mode --detect --sync : informer si des désyncs sont détectés
+    if (options.sync && profile.sourceMapStats.totalDesync > 0) {
+      console.error(
+        `\n\u26a0\ufe0f  ${profile.sourceMapStats.totalDesync} stub(s) désynchronisé(s) détecté(s).\n` +
+          `   Exécutez \`unitix --auto --sync\` pour les mettre à jour.\n`,
+      );
+    }
+
+    // Mode CI : vérifier les stubs manquants
+    if (options.ci) {
+      const missing = profile.sourceMapStats.totalTestsMissing;
+      if (missing > 0) {
+        console.error(
+          `\n❌ CI — ${missing} stub(s) manquant(s). Exécutez \`unitix --auto\` pour les générer.\n`,
+        );
+        process.exit(1);
+      } else {
+        console.error(
+          `\n✅ CI — Tous les stubs sont présents (${profile.sourceMapStats.totalSourceFiles} sources).\n`,
+        );
+      }
+    }
+  } catch (err) {
+    console.error("\n❌ Erreur lors de la détection :", err.message);
+    if (options.verbose) console.error(err.stack);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+// ─── Mode : --auto ───────────────────────────────────────────────────────────────
+
+if (options.auto) {
+  try {
+    const { profile, summary } = await generateTestsAuto(
+      resolve(process.cwd()),
+      {
+        workspace: options.workspace,
+        module: options.module,
+        sprint: options.sprint,
+        dryRun: options.dryRun,
+        force: options.force,
+        skipExisting: options.skipExisting,
+        verbose: options.verbose,
+        sync: options.sync,
+      },
+    );
+
+    if (!options.json && options.verbose) printProfile(profile);
+
+    // Mode JSON : sortie machine-readable sur stdout
+    if (options.json) {
+      process.stdout.write(
+        JSON.stringify({ profile, summary }, null, 2) + "\n",
+      );
+    }
+
+    // Mode CI : exit 1 si erreurs
+    if (options.ci && summary.errors > 0) {
+      console.error(
+        `\n\u274c CI \u2014 ${summary.errors} erreur(s) de g\u00e9n\u00e9ration. V\u00e9rifiez les fichiers sources.\n`,
+      );
+      process.exit(1);
+    }
+
+    // En mode --sync, afficher combien de stubs ont été resynchronisés
+    if (options.sync && summary.synced > 0) {
+      console.error(
+        `\n\ud83d\udd04 ${summary.synced} stub(s) resynchronisé(s) avec succès.\n`,
+      );
+    }
+    if (options.sync && summary.synced === 0 && summary.skipped > 0) {
+      console.error(
+        `\n\u2705 Tous les stubs sont à jour \u2014 aucune resynchronisation nécessaire.\n`,
+      );
+    }
+
+    // Avertissement architecture non supportée (inchangé)
+    if (
+      !summary.total &&
+      profile.type !== "clean-architecture" &&
+      profile.type !== "feature-based"
+    ) {
+      console.warn(
+        `\n⚠️  Architecture "${profile.type}" détectée — la génération automatique ` +
+          `n'est pas encore implémentée pour ce type.\n` +
+          `   Utilisez un fichier unitix.config.mjs pour une configuration manuelle.\n`,
+      );
+    }
+  } catch (err) {
+    console.error("\n❌ Fatal error:", err.message);
+    if (options.verbose) console.error(err.stack);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+// ─── Mode : config manuelle (comportement original) ──────────────────────────
+
+const configFlagArg = process.argv.find((a) => a.startsWith("--config="));
+const configFlagPath = configFlagArg
+  ? resolve(process.cwd(), configFlagArg.slice(9))
+  : null;
 
 const candidatePaths = [
   configFlagPath,
-  resolve(process.cwd(), 'unitix.config.mjs'),
-  resolve(process.cwd(), 'generate-tests.config.mjs'),
+  resolve(process.cwd(), "unitix.config.mjs"),
+  resolve(process.cwd(), "generate-tests.config.mjs"),
 ].filter(Boolean);
 
 let baseConfig = { projectRoot: process.cwd() };
@@ -53,25 +339,21 @@ for (const configPath of candidatePaths) {
   }
 }
 
-// ─── Fusion config + options CLI ──────────────────────────────────────────────
-
 const config = {
   ...baseConfig,
-  workspace:    options.workspace,
-  module:       options.module,
-  sprint:       options.sprint,
-  dryRun:       options.dryRun,
-  force:        options.force,
+  workspace: options.workspace,
+  module: options.module,
+  sprint: options.sprint,
+  dryRun: options.dryRun,
+  force: options.force,
   skipExisting: options.skipExisting,
-  verbose:      options.verbose,
+  verbose: options.verbose,
 };
-
-// ─── Exécution ────────────────────────────────────────────────────────────────
 
 try {
   await generateTests(config);
 } catch (err) {
-  console.error('\n❌ Fatal error:', err.message);
+  console.error("\n❌ Fatal error:", err.message);
   if (options.verbose) console.error(err.stack);
   process.exit(1);
 }

@@ -19,11 +19,11 @@
  * @returns {string}
  */
 function indent(str, n) {
-  const pad = ' '.repeat(n);
+  const pad = " ".repeat(n);
   return str
-    .split('\n')
-    .map(line => (line.trim() === '' ? '' : pad + line))
-    .join('\n');
+    .split("\n")
+    .map((line) => (line.trim() === "" ? "" : pad + line))
+    .join("\n");
 }
 
 // ─── Sections du template ─────────────────────────────────────────────────────
@@ -39,17 +39,19 @@ function renderHeader(ctx) {
     `/**`,
     ` * ${ctx.componentName}.test.tsx`,
     ` * Tests composant — ${ctx.feature} / ${ctx.componentName}`,
-    ` * ${'─'.repeat(77)}`,
-    ` * Généré par : scripts/generate-tests.mjs`,
-    ` * Sprint     : Tests 2 — Composants Frontend`,
+    ` * ${"\u2500".repeat(77)}`,
+    ` * G\u00e9n\u00e9r\u00e9 par : Unitix v0.4.1`,
     ` * Feature    : ${ctx.feature}`,
     ` */`,
   ];
-  return lines.join('\n');
+  if (ctx.sourceHash) {
+    lines.push(`// @unitix-source-hash: ${ctx.sourceHash}`);
+  }
+  return lines.join("\n");
 }
 
 /**
- * Génère les imports du fichier de test de composant.
+ * G\u00e9n\u00e8re les imports du fichier de test de composant.
  *
  * Stratégie d'import du rendu :
  *   - ctx.renderHelper != null  → import nommé depuis renderHelper.importPath
@@ -69,7 +71,9 @@ function renderImports(ctx) {
 
   // ── Import du helper de rendu ─────────────────────────────────────────────
   if (ctx.renderHelper) {
-    lines.push(`import { ${ctx.renderHelper.name} } from '${ctx.renderHelper.importPath}';`);
+    lines.push(
+      `import { ${ctx.renderHelper.name} } from '${ctx.renderHelper.importPath}';`,
+    );
   } else {
     // Pas de wrapper custom → render direct depuis RTL
     lines.push(`import { render } from '@testing-library/react';`);
@@ -79,10 +83,10 @@ function renderImports(ctx) {
   lines.push(`import { ${ctx.componentName} } from '${ctx.importPath}';`);
 
   // ── Commentaire props types ────────────────────────────────────────────────
-  lines.push('');
+  lines.push("");
   lines.push(`// TODO: Importer les types de props si nécessaire`);
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -99,22 +103,28 @@ function renderContextNotes(ctx) {
   const notes = [];
 
   if (ctx.usesTranslation) {
-    notes.push(`// Note: useTranslation est mocké via ${ctx.renderHelper ? ctx.renderHelper.name : 'le wrapper de rendu'}`);
+    notes.push(
+      `// Note: useTranslation est mocké via ${ctx.renderHelper ? ctx.renderHelper.name : "le wrapper de rendu"}`,
+    );
   }
 
   if (ctx.usesRouter) {
-    notes.push(`// Note: useNavigate / useParams sont fournis via le wrapper de rendu`);
+    notes.push(
+      `// Note: useNavigate / useParams sont fournis via le wrapper de rendu`,
+    );
   }
 
   if (ctx.usesQuery) {
-    notes.push(`// Note: React Query (useQuery / useMutation) est configuré via le wrapper de rendu`);
+    notes.push(
+      `// Note: React Query (useQuery / useMutation) est configuré via le wrapper de rendu`,
+    );
   }
 
   if (ctx.propsFields && ctx.propsFields.length > 0) {
-    notes.push(`// Props détectées : ${ctx.propsFields.join(', ')}`);
+    notes.push(`// Props détectées : ${ctx.propsFields.join(", ")}`);
   }
 
-  return notes.join('\n');
+  return notes.join("\n");
 }
 
 /**
@@ -126,7 +136,7 @@ function renderContextNotes(ctx) {
  * @returns {string}
  */
 function renderFnName(ctx) {
-  return ctx.renderHelper ? ctx.renderHelper.name : 'render';
+  return ctx.renderHelper ? ctx.renderHelper.name : "render";
 }
 
 /**
@@ -144,12 +154,13 @@ function renderPropsHint(ctx) {
   // Génère un exemple avec les noms de props détectées
   const propEntries = ctx.propsFields
     .slice(0, 3) // limiter à 3 pour ne pas surcharger
-    .map(f => `${f}: /* valeur */`)
-    .join(', ');
+    .map((f) => `${f}: /* valeur */`)
+    .join(", ");
 
-  const suffix = ctx.propsFields.length > 3
-    ? ` /* ... + ${ctx.propsFields.length - 3} autres */`
-    : '';
+  const suffix =
+    ctx.propsFields.length > 3
+      ? ` /* ... + ${ctx.propsFields.length - 3} autres */`
+      : "";
 
   return `    // const props = { ${propEntries}${suffix} };`;
 }
@@ -161,8 +172,8 @@ function renderPropsHint(ctx) {
  * @returns {string}
  */
 function renderTests(ctx) {
-  const renderFn   = renderFnName(ctx);
-  const propsHint  = renderPropsHint(ctx);
+  const renderFn = renderFnName(ctx);
+  const propsHint = renderPropsHint(ctx);
 
   // Exemple de JSX dans le commentaire — utilise le nom du composant
   const jsxExample = `<${ctx.componentName} {...props} />`;
@@ -193,7 +204,9 @@ function renderTests(ctx) {
     lines.push(`    // ex: ${firstProp} = '<valeur_a>' → résultat attendu A`);
     lines.push(`    // ex: ${firstProp} = '<valeur_b>' → résultat attendu B`);
   } else {
-    lines.push(`    // ex: prop = 'valeur_a' → classe CSS X, texte "Libellé A"`);
+    lines.push(
+      `    // ex: prop = 'valeur_a' → classe CSS X, texte "Libellé A"`,
+    );
   }
 
   lines.push(
@@ -206,7 +219,7 @@ function renderTests(ctx) {
     `});`,
   );
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 // ─── Export principal ─────────────────────────────────────────────────────────
@@ -236,26 +249,32 @@ function renderTests(ctx) {
  */
 export function renderFrontendComponentTest(ctx) {
   // Validation défensive du contexte
-  if (!ctx || typeof ctx !== 'object') {
-    throw new TypeError('[renderFrontendComponentTest] ctx doit être un objet non-null');
+  if (!ctx || typeof ctx !== "object") {
+    throw new TypeError(
+      "[renderFrontendComponentTest] ctx doit être un objet non-null",
+    );
   }
   if (!ctx.componentName) {
-    throw new TypeError('[renderFrontendComponentTest] ctx.componentName est requis');
+    throw new TypeError(
+      "[renderFrontendComponentTest] ctx.componentName est requis",
+    );
   }
   if (!ctx.importPath) {
-    throw new TypeError('[renderFrontendComponentTest] ctx.importPath est requis');
+    throw new TypeError(
+      "[renderFrontendComponentTest] ctx.importPath est requis",
+    );
   }
 
   // Normalisation des champs optionnels
   const safeCtx = {
     ...ctx,
-    feature:         ctx.feature         ?? 'shared',
-    propsFields:     ctx.propsFields      ?? [],
-    usesTranslation: ctx.usesTranslation  ?? false,
-    usesRouter:      ctx.usesRouter       ?? false,
-    usesQuery:       ctx.usesQuery        ?? false,
-    testFramework:   ctx.testFramework    ?? 'vitest',
-    renderHelper:    ctx.renderHelper     ?? null,
+    feature: ctx.feature ?? "shared",
+    propsFields: ctx.propsFields ?? [],
+    usesTranslation: ctx.usesTranslation ?? false,
+    usesRouter: ctx.usesRouter ?? false,
+    usesQuery: ctx.usesQuery ?? false,
+    testFramework: ctx.testFramework ?? "vitest",
+    renderHelper: ctx.renderHelper ?? null,
   };
 
   // Génération des notes contextuelles (potentiellement vide)
@@ -263,19 +282,28 @@ export function renderFrontendComponentTest(ctx) {
 
   const sections = [
     renderHeader(safeCtx),
-    '',
+    "",
+    "// @unitix:begin",
+    "",
     renderImports(safeCtx),
   ];
 
   // Insertion des notes contextuelles si présentes
   if (contextNotes) {
-    sections.push('');
+    sections.push("");
     sections.push(contextNotes);
   }
 
-  sections.push('');
+  sections.push("");
   sections.push(renderTests(safeCtx));
-  sections.push(''); // newline final
+  sections.push("// @unitix:end");
+  sections.push("");
+  sections.push(`// ${"─".repeat(3)} Tests personnalisés ${"─".repeat(39)}`);
+  sections.push(
+    `// Les blocs ci-dessous sont préservés lors d'un \`unitix --sync\`.`,
+  );
+  sections.push(`// Ajoutez ici vos tests supplémentaires pour ce composant.`);
+  sections.push("");
 
-  return sections.join('\n');
+  return sections.join("\n");
 }

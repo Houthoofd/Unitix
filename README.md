@@ -1,43 +1,76 @@
 # Unitix
 
-> Test stub generator for Clean Architecture projects (TypeScript / Jest / Vitest)
->
-> Created by **[odyssee-software](https://github.com/odyssee-software)**
+> Générateur de stubs de tests adaptatif pour projets TypeScript.
+> Détecte l'architecture de ton projet et scaffolde les bons tests au bon endroit — sans configuration.
 
-Unitix scans your project's source files, parses them with a TypeScript AST, and scaffolds
-ready-to-run test stubs — so you spend your time writing assertions, not boilerplate.
-
-[![npm version](https://img.shields.io/npm/v/unitix.svg)](https://www.npmjs.com/package/unitix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![GitHub Packages](https://img.shields.io/badge/published-GitHub%20Packages-blue)](https://github.com/Houthoofd/Unitix/packages)
 
 ---
 
-## Features
+## Pourquoi Unitix ?
 
-- **AST-powered** — uses `@typescript-eslint/typescript-estree` to accurately extract class names,
-  constructor params, interface methods, React props and hook signatures
-- **Clean Architecture aware** — knows about use-cases, repository interfaces, and DI patterns
-- **Framework agnostic** — generates Jest or Vitest stubs depending on your config
-- **Zero-bloat stubs** — every generated test passes immediately (`expect(true).toBe(true)`)
-  and includes `// TODO:` comments to guide you to the real assertions
-- **Dry-run mode** — preview what would be generated without touching the filesystem
-- **Modular config** — a single `unitix.config.mjs` file adapts the generator to any project
+Écrire les fichiers de tests from scratch est chronophage et répétitif.
+Unitix scanne ton projet, **détecte son architecture**, et génère automatiquement les squelettes de tests adaptés : mocks de repositories, wrappers RTL pour les composants, `renderHook` pour les hooks — il ne reste plus qu'à écrire les assertions.
 
----
-
-## Install
-
-```bash
-npm install -D unitix
-# or
-pnpm add -D unitix
+```
+npx unitix --auto
 ```
 
+C'est tout. Unitix fait le reste.
+
 ---
 
-## Quick start
+## Fonctionnalités
 
-### 1. Create a config file
+| Fonctionnalité | Description |
+|---|---|
+| **Détection d'architecture** | Identifie Clean Architecture, Feature-Based, MVC, Next.js, Monorepo |
+| **Source map complète** | Cartographie TOUS les dossiers sources → dossiers de tests, avec état de couverture |
+| **Parsing AST** | Extrait classes, constructeurs, interfaces, props React et signatures de hooks |
+| **Stubs prêts à l'emploi** | Chaque test généré passe immédiatement avec des `// TODO:` pour guider |
+| **Dry-run** | Prévisualise sans toucher le filesystem |
+| **Incremental** | Ignore les fichiers déjà existants (skipExisting par défaut) |
+| **Mode manuel** | Config explicite via `unitix.config.mjs` pour les cas non standards |
+
+---
+
+## Installation
+
+```bash
+npm install -D @houthoofd/unitix
+# ou
+pnpm add -D @houthoofd/unitix
+```
+
+> **GitHub Packages** — ajouter `.npmrc` à la racine :
+> ```
+> @houthoofd:registry=https://npm.pkg.github.com
+> ```
+
+---
+
+## Démarrage rapide
+
+### Mode automatique (recommandé)
+
+```bash
+# 1. Analyser l'architecture sans rien générer
+npx unitix --detect
+
+# 2. Générer tous les stubs de tests
+npx unitix --auto
+
+# 3. Cibler un workspace
+npx unitix --auto --workspace=backend
+npx unitix --auto --workspace=frontend
+
+# 4. Prévisualiser d'abord
+npx unitix --auto --dry-run
+```
+
+### Mode manuel (avec config)
 
 ```js
 // unitix.config.mjs
@@ -50,100 +83,130 @@ export const config = {
   projectRoot: ROOT,
 
   backend: {
-    modulesDir:        resolve(ROOT, 'src/modules'),
-    useCasesGlob:      'application/use-cases',
-    repositoriesDir:   'domain/repositories',
+    modulesDir:        resolve(ROOT, 'backend/src/modules'),
     testFramework:     'jest',
     testFileExtension: '.test.ts',
   },
 
   frontend: {
-    featuresDir:           resolve(ROOT, 'src/features'),
-    sharedComponentsDir:   resolve(ROOT, 'src/shared/components'),
+    featuresDir:           resolve(ROOT, 'frontend/src/features'),
+    sharedComponentsDir:   resolve(ROOT, 'frontend/src/shared/components'),
     testFramework:         'vitest',
     testFileExtension:     '.test.tsx',
     hookTestFileExtension: '.test.ts',
-    renderHelper: {
-      name:       'renderWithProviders',
-      importPath: '@/shared/test/renderWithProviders',
-    },
   },
 };
 ```
 
-### 2. Run
-
 ```bash
-# Preview without writing
-npx unitix --dry-run
-
-# Generate all test stubs
-npx unitix
-
-# Backend use-cases only
-npx unitix --workspace=backend
-
-# Single module
-npx unitix --module=alerts
-
-# Force regenerate (overwrite existing)
-npx unitix --force
+npx unitix --workspace=backend --module=alerts
 ```
 
 ---
 
-## CLI options
+## CLI — Référence complète
 
-| Option | Values | Default | Description |
+### Commandes
+
+| Commande | Description |
+|---|---|
+| `--detect` | Analyse l'architecture et affiche le profil complet (sans génération) |
+| `--auto` | Détecte l'architecture et génère les tests automatiquement |
+| `--help` | Affiche l'aide |
+
+### Options
+
+| Option | Valeurs | Défaut | Description |
 |---|---|---|---|
-| `--workspace` | `backend` \| `frontend` \| `all` | `all` | Target workspace |
-| `--module` | module name | — | Filter to a single module (e.g. `alerts`) |
-| `--sprint` | `1` \| `2` \| `all` | `all` | Sprint filter (1=use-cases, 2=components) |
-| `--config` | path | auto-detect | Path to config file |
-| `--dry-run` | — | `false` | Preview without writing |
-| `--force` | — | `false` | Overwrite existing test files |
-| `--verbose` | — | `false` | Detailed AST parsing logs |
-| `--help` | — | — | Show help |
+| `--workspace` | `backend` \| `frontend` \| `all` | `all` | Workspace ciblé |
+| `--module` | nom du module | — | Filtre sur un module (ex : `alerts`) |
+| `--sprint` | `1` \| `2` \| `all` | `all` | Sprint ciblé (1=use-cases, 2=composants) |
+| `--config` | chemin | auto-détecté | Chemin vers le fichier de config |
+| `--dry-run` | — | `false` | Prévisualise sans écrire |
+| `--force` | — | `false` | Écrase les fichiers existants |
+| `--verbose` | — | `false` | Logs détaillés (parsing AST, config) |
 
 ---
 
-## Programmatic API
+## Sortie de `--detect`
 
-```js
-import { generateTests } from 'unitix';
-import { config }        from './unitix.config.mjs';
+```
+  Unitix — Analyse d'architecture
+  ──────────────────────────────────────────────────
+  Type        : clean-architecture
+  Confiance   : high (score: 13)
 
-const summary = await generateTests(config);
-console.log(`Created: ${summary.created}, Skipped: ${summary.skipped}`);
+  Frameworks  :
+    Langage      : typescript
+    Backend      : nestjs
+    Frontend     : react
+    Test runner  : jest
+    Bundler      : vite
+
+  Chemins détectés :
+    modulesDir      : backend/src/modules
+    featuresDir     : frontend/src/features
+
+  Stratégie de tests :
+    Placement  : colocated (__tests__/)
+    Règles     :
+      use-cases [jest]   → **/application/use-cases/**/*UseCase.ts
+      components [jest]  → **/features/**/components/**/*.tsx
+      hooks [jest]       → **/features/**/hooks/use*.ts
+
+  Cartographie sources ↔ tests :
+  Couverture : ████████████░░░░░░░░ 66%  142 existants  73 à créer  (215 sources, 40 dossiers)
+
+  [backend]
+    alerts
+      ✓ complet  application/use-cases  (11 src)  →  backend/src/.../alerts/use-cases/__tests__
+    payments
+      □ absent   use-cases/payments     (6 src)   →  backend/src/.../payments/use-cases/payments/__tests__
+      □ absent   use-cases/plans        (6 src)   →  backend/src/.../payments/use-cases/plans/__tests__
+      □ absent   use-cases/schedules    (7 src)   →  backend/src/.../payments/use-cases/schedules/__tests__
+  ...
 ```
 
 ---
 
-## What gets generated
+## Architectures détectées
 
-### Backend use-case stub (Jest)
+| Type | Signaux clés | Stratégie de tests |
+|---|---|---|
+| `clean-architecture` | `src/modules/`, `use-cases/`, `nest-cli.json`, NestJS | `__tests__/` colocalisés |
+| `feature-based` | `src/features/`, hooks `use*.ts`, Vite/React | `__tests__/` colocalisés |
+| `mvc-layered` | `controllers/`, `services/`, Express/Fastify/Koa | `tests/controllers/`, `tests/services/` |
+| `nextjs` | dépendance `next`, `pages/` ou `app/`, `next.config.*` | `__tests__/` colocalisés |
+| `monorepo` | `pnpm-workspace.yaml`, `turbo.json`, `packages/` | par package |
+| `unknown` | aucun signal suffisant | `__tests__/` colocalisés (défaut) |
+
+---
+
+## Ce qui est généré
+
+### Stub backend — Use-Case (Jest)
 
 ```typescript
-// modules/alerts/application/use-cases/__tests__/CreateAlertTypeUseCase.test.ts
+// alerts/application/use-cases/__tests__/CreateAlertTypeUseCase.test.ts
 
 import { CreateAlertTypeUseCase } from '../CreateAlertTypeUseCase';
 import type { IAlertRepository }  from '../../../domain/repositories/IAlertRepository';
 
 const mockRepo: jest.Mocked<IAlertRepository> = {
-  findAllAlertTypes:   jest.fn(),
-  createAlertType:     jest.fn(),
-  // ... all interface methods
+  findAllAlertTypes: jest.fn(),
+  createAlertType:   jest.fn(),
+  // ... toutes les méthodes de l'interface
 } as jest.Mocked<IAlertRepository>;
 
 let useCase: CreateAlertTypeUseCase;
 beforeEach(() => { useCase = new CreateAlertTypeUseCase(mockRepo); });
-afterEach(() => { jest.clearAllMocks(); });
+afterEach(()  => { jest.clearAllMocks(); });
 
 describe('CreateAlertTypeUseCase', () => {
   describe('execute', () => {
     it('devrait retourner le résultat quand les données sont valides', async () => {
       // TODO: mockRepo.createAlertType.mockResolvedValue(...)
-      // const result = await useCase.execute({ ... });
+      // const result = await useCase.execute({ name: '...' });
       // expect(result).toBeDefined();
       expect(true).toBe(true); // placeholder
     });
@@ -157,39 +220,126 @@ describe('CreateAlertTypeUseCase', () => {
 });
 ```
 
+### Stub frontend — Composant React (Vitest + RTL)
+
+```typescript
+// features/alerts/components/__tests__/AlertTypeBadge.test.tsx
+
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen }           from '@testing-library/react';
+import { AlertTypeBadge }           from '../AlertTypeBadge';
+
+describe('AlertTypeBadge', () => {
+  it('se rend sans erreur', () => {
+    render(<AlertTypeBadge />);
+    expect(true).toBe(true); // TODO: ajouter des assertions
+  });
+
+  it('affiche les props correctement', () => {
+    // TODO: render(<AlertTypeBadge prop="value" />);
+    // expect(screen.getByText('...')).toBeInTheDocument();
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Stub frontend — Hook (Vitest + renderHook)
+
+```typescript
+// features/alerts/hooks/__tests__/useAlerts.test.ts
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor }                  from '@testing-library/react';
+import { useAlertTypes, useCreateAlertType }    from '../useAlerts';
+
+describe('useAlerts', () => {
+  describe('useAlertTypes', () => {
+    it('retourne les données initiales', async () => {
+      const { result } = renderHook(() => useAlertTypes());
+      await waitFor(() => expect(result.current).toBeDefined());
+      // TODO: expect(result.current.data).toEqual([...]);
+    });
+  });
+});
+```
+
 ---
 
-## Architecture
+## API programmatique
+
+```js
+import { generateTests, generateTestsAuto, detectArchitecture } from '@houthoofd/unitix';
+
+// Détecter l'architecture uniquement
+const profile = await detectArchitecture('/path/to/project');
+console.log(profile.type);          // 'clean-architecture'
+console.log(profile.confidence);    // 'high'
+console.log(profile.sourceMapStats); // { totalDirs: 40, totalSourceFiles: 215, ... }
+
+// Générer automatiquement (sans config)
+const { profile, summary } = await generateTestsAuto('/path/to/project', {
+  workspace: 'backend',
+  dryRun: false,
+});
+console.log(`Créés : ${summary.created}`);
+
+// Générer avec config manuelle
+import { config } from './unitix.config.mjs';
+const summary = await generateTests(config);
+console.log(`Créés : ${summary.created}, Ignorés : ${summary.skipped}`);
+```
+
+---
+
+## Architecture interne
 
 ```
 unitix/
-├── index.mjs               ← Public API
-├── engine.mjs              ← Main orchestrator
-├── types.mjs               ← JSDoc type contracts
-├── cli.mjs                 ← CLI arg parser
-├── logger.mjs              ← Colored ANSI output
-├── fs-utils.mjs            ← ensureDir / writeFileSafe / fileExists
-├── parsers/
-│   ├── use-case-parser.mjs   ← AST → UseCaseInfo
-│   ├── interface-parser.mjs  ← AST → InterfaceInfo
-│   ├── component-parser.mjs  ← AST → ComponentInfo
-│   └── hook-parser.mjs       ← AST → HookInfo
-├── scanners/
-│   ├── backend-scanner.mjs   ← Walk modules/**/use-cases/
-│   └── frontend-scanner.mjs  ← Walk features/**/components + hooks/
-├── generators/
+├── index.mjs                  ← API publique (generateTests, generateTestsAuto, detectArchitecture)
+├── engine.mjs                 ← Orchestrateur principal
+├── types.mjs                  ← Contrats JSDoc (ArchitectureProfile, TestStrategy, SourceDirEntry…)
+├── cli.mjs                    ← Parser d'arguments CLI
+├── logger.mjs                 ← Sortie ANSI colorée
+├── fs-utils.mjs               ← ensureDir / writeFileSafe / fileExists / readFileSafe
+│
+├── detectors/                 ← Détection d'architecture
+│   ├── architecture-detector.mjs  ← Orchestrateur : scoring + sélection + profil complet
+│   ├── framework-detector.mjs     ← Lit package.json → NestJS? React? Jest? Vitest?
+│   ├── path-detector.mjs          ← Scanne les dossiers → modules/? features/? controllers/?
+│   ├── test-strategy-builder.mjs  ← Construit les TestRule[] adaptées à l'archi
+│   └── source-mapper.mjs          ← Cartographie récursive sources ↔ dossiers __tests__
+│
+├── parsers/                   ← Parsing AST des fichiers source
+│   ├── use-case-parser.mjs        ← Classe, constructeur, execute() → UseCaseInfo
+│   ├── interface-parser.mjs       ← Interface TS → méthodes à mocker
+│   ├── component-parser.mjs       ← Composant React → props, dépendances
+│   └── hook-parser.mjs            ← Hook → signatures exportées, useQuery/useMutation
+│
+├── scanners/                  ← Localisation des fichiers sources
+│   ├── backend-scanner.mjs        ← Walk récursif modules/**/use-cases/**/*UseCase.ts
+│   └── frontend-scanner.mjs       ← Walk features/**/components + hooks/
+│
+├── generators/                ← Assemblage parser + template → contenu du test
 │   ├── backend-generator.mjs
 │   └── frontend-generator.mjs
-├── templates/
-│   ├── backend-use-case.mjs    ← fn(ctx) → string (Jest)
-│   ├── frontend-component.mjs  ← fn(ctx) → string (Vitest + RTL)
-│   └── frontend-hook.mjs       ← fn(ctx) → string (Vitest + renderHook)
+│
+├── templates/                 ← Fonctions de rendu (ctx) → string
+│   ├── backend-use-case.mjs       ← Stub Jest avec mocks de repositories
+│   ├── frontend-component.mjs     ← Stub Vitest + RTL
+│   └── frontend-hook.mjs          ← Stub Vitest + renderHook
+│
 └── bin/
-    └── unitix.mjs            ← CLI binary
+    └── unitix                 ← CLI binary (--detect, --auto, mode config)
 ```
+
+---
+
+## Roadmap
+
+Voir [ROADMAP.md](./ROADMAP.md) pour le détail des versions passées et à venir.
 
 ---
 
 ## License
 
-MIT © [Benoit Houthoofd](https://github.com/Houthoofd) — [odyssee-software](https://github.com/odyssee-software)
+MIT © [Benoit Houthoofd](https://github.com/Houthoofd)

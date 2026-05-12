@@ -7,11 +7,16 @@
  * @module generators/backend-generator
  */
 
-import { dirname, basename, join, relative } from 'path';
+import { dirname, basename, join, relative } from "path";
 
-import { parseUseCase }                      from '../parsers/use-case-parser.mjs';
-import { parseInterface, findInterfaceFile } from '../parsers/interface-parser.mjs';
-import { renderBackendUseCaseTest }          from '../templates/backend-use-case.mjs';
+import { computeFileHash } from "../hash-utils.mjs";
+
+import { parseUseCase } from "../parsers/use-case-parser.mjs";
+import {
+  parseInterface,
+  findInterfaceFile,
+} from "../parsers/interface-parser.mjs";
+import { renderBackendUseCaseTest } from "../templates/backend-use-case.mjs";
 
 /** @import { BackendConfig, GeneratedTest } from '../types.mjs' */
 
@@ -27,9 +32,9 @@ import { renderBackendUseCaseTest }          from '../templates/backend-use-case
  */
 function computeRelativePath(fromFile, toFile) {
   const fromDir = dirname(fromFile);
-  let rel = relative(fromDir, toFile).replace(/\\/g, '/');
-  rel = rel.replace(/\.(ts|tsx)$/, '');
-  if (!rel.startsWith('.')) rel = './' + rel;
+  let rel = relative(fromDir, toFile).replace(/\\/g, "/");
+  rel = rel.replace(/\.(ts|tsx)$/, "");
+  if (!rel.startsWith(".")) rel = "./" + rel;
   return rel;
 }
 
@@ -55,24 +60,40 @@ export async function generateBackendTest(filePath, config) {
   try {
     useCaseInfo = await parseUseCase(filePath);
   } catch (err) {
-    console.warn(`[backend-generator] Erreur lors du parsing du use-case : ${filePath} — ${err.message}`);
+    console.warn(
+      `[backend-generator] Erreur lors du parsing du use-case : ${filePath} — ${err.message}`,
+    );
     return null;
   }
   if (!useCaseInfo) return null;
 
   // ── Étape 2 — Calculer le testFilePath ────────────────────────────────────
-  const ext          = config.testFileExtension ?? '.test.ts';
-  const testDir      = join(dirname(filePath), '__tests__');
-  const testFilePath = join(testDir, basename(filePath, '.ts') + ext);
+  const ext = config.testFileExtension ?? ".test.ts";
+  const testDir = join(dirname(filePath), "__tests__");
+  const testFilePath = join(testDir, basename(filePath, ".ts") + ext);
+
+  // ── Étape 2b — Calculer le hash du fichier source ────────────────────────────────
+  let sourceHash = null;
+  try {
+    sourceHash = await computeFileHash(filePath);
+  } catch {
+    // Hash non critique : si échec, on continue sans
+  }
 
   // ── Étape 3 — Trouver et parser les interfaces repository ─────────────────
   const repositories = [];
 
-  for (const param of useCaseInfo.constructorParams.filter(p => p.isRepository)) {
+  for (const param of useCaseInfo.constructorParams.filter(
+    (p) => p.isRepository,
+  )) {
     // Recherche du fichier d'interface dans l'arborescence modulesDir
     let interfaceFilePath = null;
     try {
-      interfaceFilePath = await findInterfaceFile(param.type, config.modulesDir, filePath);
+      interfaceFilePath = await findInterfaceFile(
+        param.type,
+        config.modulesDir,
+        filePath,
+      );
     } catch (err) {
       console.warn(
         `[backend-generator] Erreur lors de la recherche de l'interface "${param.type}" — ${err.message}`,
@@ -92,27 +113,27 @@ export async function generateBackendTest(filePath, config) {
 
       if (interfaceInfo) {
         repositories.push({
-          paramName:     param.name,
+          paramName: param.name,
           interfaceName: interfaceInfo.interfaceName,
-          importPath:    computeRelativePath(testFilePath, interfaceFilePath),
-          methods:       interfaceInfo.methods,
+          importPath: computeRelativePath(testFilePath, interfaceFilePath),
+          methods: interfaceInfo.methods,
         });
       } else {
         // Interface trouvée mais non parsable → mock vide avec chemin calculé
         repositories.push({
-          paramName:     param.name,
+          paramName: param.name,
           interfaceName: param.type,
-          importPath:    computeRelativePath(testFilePath, interfaceFilePath),
-          methods:       [],
+          importPath: computeRelativePath(testFilePath, interfaceFilePath),
+          methods: [],
         });
       }
     } else {
       // Interface introuvable → fallback avec chemin conventionnel
       repositories.push({
-        paramName:     param.name,
+        paramName: param.name,
         interfaceName: param.type,
-        importPath:    '../../../domain/repositories/' + param.type,
-        methods:       [],
+        importPath: "../../../domain/repositories/" + param.type,
+        methods: [],
       });
     }
   }
@@ -121,15 +142,19 @@ export async function generateBackendTest(filePath, config) {
 
   /** @type {import('../types.mjs').BackendUseCaseTemplateContext} */
   const ctx = {
-    className:            useCaseInfo.className,
-    module:               useCaseInfo.module,
-    sourceImportPath:     computeRelativePath(testFilePath, filePath),
+    className: useCaseInfo.className,
+    module: useCaseInfo.module,
+    sourceImportPath: computeRelativePath(testFilePath, filePath),
     repositories,
     // Les chemins de services externes sont passés tels quels (ex: '@/shared/services/JwtService.js')
     externalServiceMocks: useCaseInfo.externalServiceImports,
-    executeParams:        useCaseInfo.executeParams,
-    returnType:           useCaseInfo.returnType,
-    isVoid:               useCaseInfo.isVoid,
+    executeParams: useCaseInfo.executeParams,
+    returnType: useCaseInfo.returnType,
+    isVoid: useCaseInfo.isVoid,
+    returnsArray: useCaseInfo.returnsArray ?? false,
+    returnsBool: useCaseInfo.returnsBool ?? false,
+    thrownExceptions: useCaseInfo.thrownExceptions ?? [],
+    sourceHash: sourceHash ?? undefined,
   };
 
   let content;
