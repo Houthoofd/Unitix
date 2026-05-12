@@ -10,6 +10,9 @@
   "exports": {
     ".": "./index.mjs"
   },
+  "scripts": {
+    "test": "node --test tests/unit/utils/sync-merger.test.mjs tests/unit/templates/backend-use-case.test.mjs tests/unit/templates/frontend-component.test.mjs tests/unit/templates/frontend-hook.test.mjs"
+  },
   "keywords": [
     "test-generator",
     "clean-architecture",

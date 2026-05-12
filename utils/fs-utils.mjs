@@ -1,11 +1,11 @@
 /**
  * @file fs-utils.mjs
  * @description Utilitaires filesystem basés sur fs/promises. Zéro dépendances externes.
- * Fait partie du générateur de tests @clubmanager/test-generator.
+ * Fait partie du générateur de tests @houthoofd/unitix.
  */
 
-import fs   from 'fs/promises';
-import path from 'path';
+import fs from "fs/promises";
+import path from "path";
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
@@ -41,12 +41,12 @@ export async function writeFileSafe(filePath, content, force = false) {
   const exists = await fileExists(filePath);
 
   if (exists && !force) {
-    return { written: false, reason: 'already exists' };
+    return { written: false, reason: "already exists" };
   }
 
   // Garantit que le dossier parent existe avant d'écrire
   await ensureDir(path.dirname(filePath));
-  await fs.writeFile(filePath, content, 'utf8');
+  await fs.writeFile(filePath, content, "utf8");
 
   return { written: true };
 }
@@ -75,10 +75,10 @@ export async function fileExists(filePath) {
  */
 export async function readFileSafe(filePath) {
   try {
-    return await fs.readFile(filePath, 'utf8');
+    return await fs.readFile(filePath, "utf8");
   } catch (err) {
     // ENOENT = fichier absent → retour null attendu
-    if (err.code === 'ENOENT') return null;
+    if (err.code === "ENOENT") return null;
     // Toute autre erreur (permissions, etc.) est remontée normalement
     throw err;
   }

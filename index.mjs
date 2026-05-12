@@ -13,5 +13,5 @@
  * @module @houthoofd/unitix
  */
 
-export { generateTests, generateTestsAuto } from "./engine.mjs";
+export { generateTests, generateTestsAuto } from "./core/engine.mjs";
 export { detectArchitecture } from "./detectors/architecture-detector.mjs";

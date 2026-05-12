@@ -14,7 +14,7 @@
 Écrire les fichiers de tests from scratch est chronophage et répétitif.
 Unitix scanne ton projet, **détecte son architecture**, et génère automatiquement les squelettes de tests adaptés : mocks de repositories, wrappers RTL pour les composants, `renderHook` pour les hooks — il ne reste plus qu'à écrire les assertions.
 
-```
+```/dev/null/quickstart.sh#L1
 npx unitix --auto
 ```
 
@@ -31,21 +31,24 @@ C'est tout. Unitix fait le reste.
 | **Parsing AST** | Extrait classes, constructeurs, interfaces, props React et signatures de hooks |
 | **Stubs prêts à l'emploi** | Chaque test généré passe immédiatement avec des `// TODO:` pour guider |
 | **Dry-run** | Prévisualise sans toucher le filesystem |
-| **Incremental** | Ignore les fichiers déjà existants (skipExisting par défaut) |
+| **Incremental** | Ignore les fichiers déjà existants (`skipExisting` par défaut) |
+| **Résynchronisation incrémentale** | `--sync` : détecte les stubs dont la source a changé et les met à jour |
+| **Préservation des tests manuels** | Zones `@unitix:begin`/`@unitix:end` — les tests ajoutés après `@unitix:end` sont préservés lors d'un `--sync` |
+| **Intégration CI** | `--ci` (exit 1 si stubs manquants), `--json` (sortie machine-readable), `--no-color` |
 | **Mode manuel** | Config explicite via `unitix.config.mjs` pour les cas non standards |
 
 ---
 
 ## Installation
 
-```bash
+```/dev/null/install.sh#L1-3
 npm install -D @houthoofd/unitix
 # ou
 pnpm add -D @houthoofd/unitix
 ```
 
 > **GitHub Packages** — ajouter `.npmrc` à la racine :
-> ```
+> ```/dev/null/.npmrc#L1
 > @houthoofd:registry=https://npm.pkg.github.com
 > ```
 
@@ -55,7 +58,7 @@ pnpm add -D @houthoofd/unitix
 
 ### Mode automatique (recommandé)
 
-```bash
+```/dev/null/quickstart-auto.sh#L1-8
 # 1. Analyser l'architecture sans rien générer
 npx unitix --detect
 
@@ -68,11 +71,14 @@ npx unitix --auto --workspace=frontend
 
 # 4. Prévisualiser d'abord
 npx unitix --auto --dry-run
+
+# 5. Resynchroniser les stubs dont la source a changé
+npx unitix --sync
 ```
 
 ### Mode manuel (avec config)
 
-```js
+```/dev/null/unitix.config.mjs#L1-24
 // unitix.config.mjs
 import { resolve, dirname } from 'path';
 import { fileURLToPath }    from 'url';
@@ -98,7 +104,7 @@ export const config = {
 };
 ```
 
-```bash
+```/dev/null/quickstart-manual.sh#L1
 npx unitix --workspace=backend --module=alerts
 ```
 
@@ -112,6 +118,7 @@ npx unitix --workspace=backend --module=alerts
 |---|---|
 | `--detect` | Analyse l'architecture et affiche le profil complet (sans génération) |
 | `--auto` | Détecte l'architecture et génère les tests automatiquement |
+| `--sync` | Resynchronise les stubs dont la source a changé (préserve les tests manuels) |
 | `--help` | Affiche l'aide |
 
 ### Options
@@ -125,12 +132,55 @@ npx unitix --workspace=backend --module=alerts
 | `--dry-run` | — | `false` | Prévisualise sans écrire |
 | `--force` | — | `false` | Écrase les fichiers existants |
 | `--verbose` | — | `false` | Logs détaillés (parsing AST, config) |
+| `--ci` | — | `false` | Mode CI — exit code 1 si stubs manquants (`--detect`) ou erreurs (`--auto`) |
+| `--json` | — | `false` | Sortie JSON machine-readable sur stdout (logs sur stderr) |
+| `--no-color` | — | `false` | Désactiver la colorisation ANSI |
+
+---
+
+## Zones gérées et tests manuels
+
+Depuis la v0.4.1, chaque stub généré par Unitix est découpé en deux zones distinctes :
+
+```/dev/null/example.test.ts#L1-20
+// @unitix:begin          ← géré par Unitix, mis à jour lors d'un --sync
+import { CreateAlertTypeUseCase } from '../CreateAlertTypeUseCase';
+import type { IAlertRepository }  from '../../../domain/repositories/IAlertRepository';
+
+const mockRepo: jest.Mocked<IAlertRepository> = {
+  findAllAlertTypes: jest.fn(),
+  createAlertType:   jest.fn(),
+} as jest.Mocked<IAlertRepository>;
+
+describe('CreateAlertTypeUseCase', () => {
+  describe('execute', () => {
+    it('devrait retourner le résultat quand les données sont valides', async () => {
+      expect(true).toBe(true); // placeholder
+    });
+  });
+});
+// @unitix:end            ← fin de la zone gérée
+
+// ─── Tests personnalisés ────────────────────────────────────────────────────
+// Les blocs ci-dessous sont préservés lors d'un `unitix --sync`.
+// Ajoutez ici vos tests supplémentaires.
+
+it('mon test custom', () => {
+  // ... ← préservé lors d'un --sync
+});
+```
+
+### Comportement lors d'un `--sync`
+
+- **Zone `@unitix:begin` → `@unitix:end`** : régénérée à partir de la source actuelle (imports, mocks, describe de base).
+- **Tout ce qui suit `@unitix:end`** : conservé tel quel, tes tests manuels ne sont jamais écrasés.
+- Si le fichier stub **ne contient pas** les marqueurs (stub créé avant la v0.4.1), il est ignoré lors du sync — tu peux le régénérer avec `--force`.
 
 ---
 
 ## Sortie de `--detect`
 
-```
+```/dev/null/detect-output.txt#L1-30
   Unitix — Analyse d'architecture
   ──────────────────────────────────────────────────
   Type        : clean-architecture
@@ -186,9 +236,10 @@ npx unitix --workspace=backend --module=alerts
 
 ### Stub backend — Use-Case (Jest)
 
-```typescript
+```/dev/null/CreateAlertTypeUseCase.test.ts#L1-40
 // alerts/application/use-cases/__tests__/CreateAlertTypeUseCase.test.ts
 
+// @unitix:begin
 import { CreateAlertTypeUseCase } from '../CreateAlertTypeUseCase';
 import type { IAlertRepository }  from '../../../domain/repositories/IAlertRepository';
 
@@ -218,13 +269,19 @@ describe('CreateAlertTypeUseCase', () => {
     });
   });
 });
+// @unitix:end
+
+// ─── Tests personnalisés ────────────────────────────────────────────────────
+// Les blocs ci-dessous sont préservés lors d'un `unitix --sync`.
+// Ajoutez ici vos tests supplémentaires.
 ```
 
 ### Stub frontend — Composant React (Vitest + RTL)
 
-```typescript
+```/dev/null/AlertTypeBadge.test.tsx#L1-25
 // features/alerts/components/__tests__/AlertTypeBadge.test.tsx
 
+// @unitix:begin
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { AlertTypeBadge }           from '../AlertTypeBadge';
@@ -241,13 +298,19 @@ describe('AlertTypeBadge', () => {
     expect(true).toBe(true);
   });
 });
+// @unitix:end
+
+// ─── Tests personnalisés ────────────────────────────────────────────────────
+// Les blocs ci-dessous sont préservés lors d'un `unitix --sync`.
+// Ajoutez ici vos tests supplémentaires.
 ```
 
 ### Stub frontend — Hook (Vitest + renderHook)
 
-```typescript
+```/dev/null/useAlerts.test.ts#L1-25
 // features/alerts/hooks/__tests__/useAlerts.test.ts
 
+// @unitix:begin
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor }                  from '@testing-library/react';
 import { useAlertTypes, useCreateAlertType }    from '../useAlerts';
@@ -261,19 +324,72 @@ describe('useAlerts', () => {
     });
   });
 });
+// @unitix:end
+
+// ─── Tests personnalisés ────────────────────────────────────────────────────
+// Les blocs ci-dessous sont préservés lors d'un `unitix --sync`.
+// Ajoutez ici vos tests supplémentaires.
+```
+
+---
+
+## Utilisation en CI
+
+Unitix s'intègre directement dans tes pipelines via `--ci`, `--json` et `--no-color`.
+
+```/dev/null/.github/workflows/ci.yml#L1-14
+# .github/workflows/ci.yml
+
+- name: Vérifier les stubs manquants
+  run: npx unitix --detect --ci
+  # → exit code 1 si des fichiers de tests sont absents
+
+- name: Resynchroniser les stubs après changements
+  run: npx unitix --sync --ci
+  # → exit code 1 si des erreurs surviennent lors du sync
+
+- name: Sortie JSON pour scripts
+  run: npx unitix --detect --json > unitix-profile.json
+  # → écrit le profil complet en JSON (logs sur stderr)
+
+- name: Générer sans couleur ANSI (logs propres)
+  run: npx unitix --auto --no-color
+```
+
+### Exemple de sortie `--json`
+
+```/dev/null/unitix-profile.json#L1-15
+{
+  "type": "clean-architecture",
+  "confidence": "high",
+  "score": 13,
+  "frameworks": {
+    "language": "typescript",
+    "backend": "nestjs",
+    "frontend": "react",
+    "testRunner": "jest",
+    "bundler": "vite"
+  },
+  "sourceMapStats": {
+    "totalDirs": 40,
+    "totalSourceFiles": 215,
+    "coveredDirs": 27,
+    "missingDirs": 13
+  }
+}
 ```
 
 ---
 
 ## API programmatique
 
-```js
+```/dev/null/programmatic-api.mjs#L1-22
 import { generateTests, generateTestsAuto, detectArchitecture } from '@houthoofd/unitix';
 
 // Détecter l'architecture uniquement
 const profile = await detectArchitecture('/path/to/project');
-console.log(profile.type);          // 'clean-architecture'
-console.log(profile.confidence);    // 'high'
+console.log(profile.type);           // 'clean-architecture'
+console.log(profile.confidence);     // 'high'
 console.log(profile.sourceMapStats); // { totalDirs: 40, totalSourceFiles: 215, ... }
 
 // Générer automatiquement (sans config)
@@ -293,43 +409,48 @@ console.log(`Créés : ${summary.created}, Ignorés : ${summary.skipped}`);
 
 ## Architecture interne
 
-```
+```/dev/null/tree.txt#L1-36
 unitix/
-├── index.mjs                  ← API publique (generateTests, generateTestsAuto, detectArchitecture)
-├── engine.mjs                 ← Orchestrateur principal
-├── types.mjs                  ← Contrats JSDoc (ArchitectureProfile, TestStrategy, SourceDirEntry…)
-├── cli.mjs                    ← Parser d'arguments CLI
-├── logger.mjs                 ← Sortie ANSI colorée
-├── fs-utils.mjs               ← ensureDir / writeFileSafe / fileExists / readFileSafe
+├── index.mjs                   ← API publique (generateTests, generateTestsAuto, detectArchitecture)
+├── types.mjs                   ← Contrats JSDoc (ArchitectureProfile, TestStrategy, SourceDirEntry…)
 │
-├── detectors/                 ← Détection d'architecture
+├── core/
+│   ├── engine.mjs              ← Orchestrateur principal
+│   └── cli.mjs                 ← Parser d'arguments CLI
+│
+├── utils/
+│   ├── logger.mjs              ← Sortie ANSI colorée (--no-color via setNoColor())
+│   ├── fs-utils.mjs            ← ensureDir / writeFileSafe / fileExists
+│   ├── hash-utils.mjs          ← computeFileHash / extractStoredHash
+│   └── sync-merger.mjs         ← hasSyncMarkers / extractManualTail / mergeSyncContent
+│
+├── detectors/                  ← Détection d'architecture (5 fichiers)
 │   ├── architecture-detector.mjs  ← Orchestrateur : scoring + sélection + profil complet
 │   ├── framework-detector.mjs     ← Lit package.json → NestJS? React? Jest? Vitest?
 │   ├── path-detector.mjs          ← Scanne les dossiers → modules/? features/? controllers/?
 │   ├── test-strategy-builder.mjs  ← Construit les TestRule[] adaptées à l'archi
 │   └── source-mapper.mjs          ← Cartographie récursive sources ↔ dossiers __tests__
 │
-├── parsers/                   ← Parsing AST des fichiers source
+├── parsers/                    ← Parsing AST des fichiers source (4 fichiers)
 │   ├── use-case-parser.mjs        ← Classe, constructeur, execute() → UseCaseInfo
 │   ├── interface-parser.mjs       ← Interface TS → méthodes à mocker
 │   ├── component-parser.mjs       ← Composant React → props, dépendances
 │   └── hook-parser.mjs            ← Hook → signatures exportées, useQuery/useMutation
 │
-├── scanners/                  ← Localisation des fichiers sources
+├── scanners/                   ← Localisation des fichiers sources (2 fichiers)
 │   ├── backend-scanner.mjs        ← Walk récursif modules/**/use-cases/**/*UseCase.ts
 │   └── frontend-scanner.mjs       ← Walk features/**/components + hooks/
 │
-├── generators/                ← Assemblage parser + template → contenu du test
+├── generators/                 ← Assemblage parser + template → contenu du test (2 fichiers)
 │   ├── backend-generator.mjs
 │   └── frontend-generator.mjs
 │
-├── templates/                 ← Fonctions de rendu (ctx) → string
+├── templates/                  ← Fonctions de rendu ctx→string (3 fichiers)
 │   ├── backend-use-case.mjs       ← Stub Jest avec mocks de repositories
 │   ├── frontend-component.mjs     ← Stub Vitest + RTL
 │   └── frontend-hook.mjs          ← Stub Vitest + renderHook
 │
-└── bin/
-    └── unitix                 ← CLI binary (--detect, --auto, mode config)
+└── bin/unitix                  ← CLI binary (--detect, --auto, --sync, mode config)
 ```
 
 ---

@@ -6,8 +6,8 @@
  * @module detectors/framework-detector
  */
 
-import { join } from 'path';
-import { readFileSafe, fileExists } from '../fs-utils.mjs';
+import { join } from "path";
+import { readFileSafe, fileExists } from "../utils/fs-utils.mjs";
 
 /** @import { FrameworkInfo } from '../types.mjs' */
 
@@ -15,40 +15,40 @@ import { readFileSafe, fileExists } from '../fs-utils.mjs';
 
 /** @type {Record<string, string[]>} */
 const BACKEND_SIGNALS = {
-  nestjs:  ['@nestjs/core', '@nestjs/common', '@nestjs/platform-express'],
-  express: ['express'],
-  fastify: ['fastify'],
-  koa:     ['koa'],
+  nestjs: ["@nestjs/core", "@nestjs/common", "@nestjs/platform-express"],
+  express: ["express"],
+  fastify: ["fastify"],
+  koa: ["koa"],
 };
 
 /** @type {Record<string, string[]>} */
 const FRONTEND_SIGNALS = {
-  react:   ['react', 'react-dom'],
-  vue:     ['vue', '@vue/core', '@vue/runtime-dom'],
-  angular: ['@angular/core'],
-  svelte:  ['svelte'],
+  react: ["react", "react-dom"],
+  vue: ["vue", "@vue/core", "@vue/runtime-dom"],
+  angular: ["@angular/core"],
+  svelte: ["svelte"],
   // 'next' est traité séparément via isNextJs
 };
 
 /** @type {Record<string, string[]>} */
 const TEST_RUNNER_SIGNALS = {
-  jest:   ['jest', '@jest/core', 'ts-jest', 'babel-jest', '@jest/globals'],
-  vitest: ['vitest'],
+  jest: ["jest", "@jest/core", "ts-jest", "babel-jest", "@jest/globals"],
+  vitest: ["vitest"],
 };
 
 /** @type {Record<string, string[]>} */
 const BUNDLER_SIGNALS = {
-  vite:    ['vite', '@vitejs/plugin-react', '@vitejs/plugin-vue'],
-  webpack: ['webpack', 'webpack-cli'],
-  esbuild: ['esbuild'],
+  vite: ["vite", "@vitejs/plugin-react", "@vitejs/plugin-vue"],
+  webpack: ["webpack", "webpack-cli"],
+  esbuild: ["esbuild"],
 };
 
 /** Fichiers signalant un monorepo à la racine */
 const MONOREPO_FILES = [
-  'pnpm-workspace.yaml',
-  'lerna.json',
-  'turbo.json',
-  'nx.json',
+  "pnpm-workspace.yaml",
+  "lerna.json",
+  "turbo.json",
+  "nx.json",
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ const MONOREPO_FILES = [
  * @returns {Promise<Record<string,any>|null>}
  */
 async function readPackageJson(dirPath) {
-  const content = await readFileSafe(join(dirPath, 'package.json'));
+  const content = await readFileSafe(join(dirPath, "package.json"));
   if (!content) return null;
   try {
     return JSON.parse(content);
@@ -79,8 +79,8 @@ async function readPackageJson(dirPath) {
  */
 function getAllDeps(pkg) {
   return new Set([
-    ...Object.keys(pkg.dependencies     ?? {}),
-    ...Object.keys(pkg.devDependencies  ?? {}),
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.devDependencies ?? {}),
     ...Object.keys(pkg.peerDependencies ?? {}),
   ]);
 }
@@ -95,7 +95,7 @@ function getAllDeps(pkg) {
  */
 function detectFirst(signals, deps) {
   for (const [name, packages] of Object.entries(signals)) {
-    if (packages.some(p => deps.has(p))) return name;
+    if (packages.some((p) => deps.has(p))) return name;
   }
   return null;
 }
@@ -124,7 +124,15 @@ export async function detectFrameworks(projectRoot) {
   }
 
   // 2. Sub-packages courants dans les projets full-stack ou monorepos
-  const subDirs = ['backend', 'frontend', 'server', 'client', 'web', 'apps', 'packages'];
+  const subDirs = [
+    "backend",
+    "frontend",
+    "server",
+    "client",
+    "web",
+    "apps",
+    "packages",
+  ];
   for (const subDir of subDirs) {
     const subPkg = await readPackageJson(join(projectRoot, subDir));
     if (subPkg) {
@@ -145,24 +153,38 @@ export async function detectFrameworks(projectRoot) {
 
   // 4. TypeScript : tsconfig.json ou dépendance 'typescript'
   const hasTypeScript =
-    allDeps.has('typescript') ||
-    await fileExists(join(projectRoot, 'tsconfig.json'));
+    allDeps.has("typescript") ||
+    (await fileExists(join(projectRoot, "tsconfig.json")));
   const language = /** @type {'typescript'|'javascript'} */ (
-    hasTypeScript ? 'typescript' : 'javascript'
+    hasTypeScript ? "typescript" : "javascript"
   );
 
   // 5. Next.js (traité séparément car React + SSR)
-  const isNextJs = allDeps.has('next');
+  const isNextJs = allDeps.has("next");
 
   // 6. Frameworks, runners, bundlers
-  const backend    = /** @type {'nestjs'|'express'|'fastify'|'koa'|null} */  (detectFirst(BACKEND_SIGNALS,      allDeps));
+  const backend = /** @type {'nestjs'|'express'|'fastify'|'koa'|null} */ (
+    detectFirst(BACKEND_SIGNALS, allDeps)
+  );
   const frontendRaw = detectFirst(FRONTEND_SIGNALS, allDeps);
   // Si Next.js est détecté, on le range dans frontend=react (Next est React-based)
-  const frontend   = /** @type {'react'|'vue'|'angular'|'svelte'|null} */ (
-    isNextJs ? 'react' : /** @type {any} */ (frontendRaw)
+  const frontend = /** @type {'react'|'vue'|'angular'|'svelte'|null} */ (
+    isNextJs ? "react" : /** @type {any} */ (frontendRaw)
   );
-  const testRunner = /** @type {'jest'|'vitest'|null} */ (detectFirst(TEST_RUNNER_SIGNALS, allDeps));
-  const bundler    = /** @type {'vite'|'webpack'|'esbuild'|null} */        (detectFirst(BUNDLER_SIGNALS,      allDeps));
+  const testRunner = /** @type {'jest'|'vitest'|null} */ (
+    detectFirst(TEST_RUNNER_SIGNALS, allDeps)
+  );
+  const bundler = /** @type {'vite'|'webpack'|'esbuild'|null} */ (
+    detectFirst(BUNDLER_SIGNALS, allDeps)
+  );
 
-  return { language, backend, frontend, testRunner, bundler, isMonorepo, isNextJs };
+  return {
+    language,
+    backend,
+    frontend,
+    testRunner,
+    bundler,
+    isMonorepo,
+    isNextJs,
+  };
 }

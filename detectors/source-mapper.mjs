@@ -14,10 +14,10 @@
  * @module detectors/source-mapper
  */
 
-import { readdir } from 'fs/promises';
-import { join, relative, basename } from 'path';
-import { fileExists } from '../fs-utils.mjs';
-import { computeFileHash, extractStoredHash } from '../hash-utils.mjs';
+import { readdir } from "fs/promises";
+import { join, relative, basename } from "path";
+import { fileExists } from "../utils/fs-utils.mjs";
+import { computeFileHash, extractStoredHash } from "../utils/hash-utils.mjs";
 
 /** @import { ArchitectureProfile, SourceDirEntry } from '../types.mjs' */
 
@@ -25,8 +25,16 @@ import { computeFileHash, extractStoredHash } from '../hash-utils.mjs';
 
 /** Dossiers à ignorer pendant le scan récursif */
 const IGNORED_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', '.next',
-  'coverage', '.turbo', '.cache', 'out', '.svelte-kit',
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  "coverage",
+  ".turbo",
+  ".cache",
+  "out",
+  ".svelte-kit",
 ]);
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
@@ -55,8 +63,12 @@ async function readDirSafe(dir) {
 async function listExistingTests(testDir) {
   const entries = await readDirSafe(testDir);
   return entries
-    .filter(e => e.isFile() && (e.name.endsWith('.test.ts') || e.name.endsWith('.test.tsx')))
-    .map(e => e.name);
+    .filter(
+      (e) =>
+        e.isFile() &&
+        (e.name.endsWith(".test.ts") || e.name.endsWith(".test.tsx")),
+    )
+    .map((e) => e.name);
 }
 
 /**
@@ -71,7 +83,12 @@ async function listExistingTests(testDir) {
  * @param {number}                       [maxDepth=8]
  * @returns {Promise<Array<{ dir: string, files: string[] }>>}
  */
-async function walkSourceDirs(rootDir, fileFilter, testDirName = '__tests__', maxDepth = 8) {
+async function walkSourceDirs(
+  rootDir,
+  fileFilter,
+  testDirName = "__tests__",
+  maxDepth = 8,
+) {
   /** @type {Array<{ dir: string, files: string[] }>} */
   const result = [];
 
@@ -87,8 +104,8 @@ async function walkSourceDirs(rootDir, fileFilter, testDirName = '__tests__', ma
 
     // Fichiers sources directement dans ce dossier
     const matchingFiles = entries
-      .filter(e => e.isFile() && fileFilter(e.name))
-      .map(e => e.name);
+      .filter((e) => e.isFile() && fileFilter(e.name))
+      .map((e) => e.name);
 
     if (matchingFiles.length > 0) {
       result.push({ dir, files: matchingFiles });
@@ -100,7 +117,7 @@ async function walkSourceDirs(rootDir, fileFilter, testDirName = '__tests__', ma
         entry.isDirectory() &&
         entry.name !== testDirName &&
         !IGNORED_DIRS.has(entry.name) &&
-        !entry.name.startsWith('.')
+        !entry.name.startsWith(".")
       ) {
         await walk(join(dir, entry.name), depth + 1);
       }
@@ -124,18 +141,26 @@ async function walkSourceDirs(rootDir, fileFilter, testDirName = '__tests__', ma
  * @param {'backend'|'frontend'|'all'} params.workspace
  * @returns {Promise<SourceDirEntry>}
  */
-async function buildEntry({ projectRoot, sourceDir, sourceFiles, testDir, ruleName, module: moduleName, workspace }) {
-  const testDirExists   = await fileExists(testDir);
-  const existingTests   = testDirExists ? await listExistingTests(testDir) : [];
-  const missingCount    = sourceFiles.length - existingTests.length;
+async function buildEntry({
+  projectRoot,
+  sourceDir,
+  sourceFiles,
+  testDir,
+  ruleName,
+  module: moduleName,
+  workspace,
+}) {
+  const testDirExists = await fileExists(testDir);
+  const existingTests = testDirExists ? await listExistingTests(testDir) : [];
+  const missingCount = sourceFiles.length - existingTests.length;
 
   // ── Détection de désynchronisation (stubs dont la source a changé) ────────────────────
   const desyncFiles = [];
   if (testDirExists) {
     for (const sourceFile of sourceFiles) {
       // Chercher le fichier de test correspondant (même nom, extension .test.ts/.test.tsx)
-      const baseName     = sourceFile.replace(/\.(ts|tsx)$/, '');
-      const testExt      = sourceFile.endsWith('.tsx') ? '.test.tsx' : '.test.ts';
+      const baseName = sourceFile.replace(/\.(ts|tsx)$/, "");
+      const testExt = sourceFile.endsWith(".tsx") ? ".test.tsx" : ".test.ts";
       const testFilePath = join(testDir, baseName + testExt);
 
       if (await fileExists(testFilePath)) {
@@ -143,7 +168,9 @@ async function buildEntry({ projectRoot, sourceDir, sourceFiles, testDir, ruleNa
         if (storedHash !== null) {
           // Hash présent → comparer avec le hash actuel du source
           try {
-            const currentHash = await computeFileHash(join(sourceDir, sourceFile));
+            const currentHash = await computeFileHash(
+              join(sourceDir, sourceFile),
+            );
             if (storedHash !== currentHash) {
               desyncFiles.push(sourceFile);
             }
@@ -158,17 +185,17 @@ async function buildEntry({ projectRoot, sourceDir, sourceFiles, testDir, ruleNa
 
   return {
     sourceDir,
-    sourceDirRelative: relative(projectRoot, sourceDir).replace(/\\/g, '/'),
-    module:            moduleName,
+    sourceDirRelative: relative(projectRoot, sourceDir).replace(/\\/g, "/"),
+    module: moduleName,
     ruleName,
     workspace,
     testDir,
-    testDirRelative:   relative(projectRoot, testDir).replace(/\\/g, '/'),
+    testDirRelative: relative(projectRoot, testDir).replace(/\\/g, "/"),
     testDirExists,
     sourceFiles,
     existingTestCount: existingTests.length,
-    missingTestCount:  Math.max(0, missingCount),
-    desyncCount:       desyncFiles.length,
+    missingTestCount: Math.max(0, missingCount),
+    desyncCount: desyncFiles.length,
     desyncFiles,
   };
 }
@@ -189,30 +216,39 @@ async function mapCleanArchSources(projectRoot, paths) {
   // ── Backend : use-cases ──────────────────────────────────────────────────────
   if (paths.modulesDir) {
     const moduleEntries = await readDirSafe(paths.modulesDir);
-    const moduleNames   = moduleEntries.filter(e => e.isDirectory()).map(e => e.name);
+    const moduleNames = moduleEntries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
 
     for (const moduleName of moduleNames) {
-      const useCasesRoot = join(paths.modulesDir, moduleName, 'application', 'use-cases');
+      const useCasesRoot = join(
+        paths.modulesDir,
+        moduleName,
+        "application",
+        "use-cases",
+      );
 
-      if (!await fileExists(useCasesRoot)) continue;
+      if (!(await fileExists(useCasesRoot))) continue;
 
       // Trouver TOUS les sous-dossiers (y compris imbriqués) ayant des *UseCase.ts
       const sourceDirs = await walkSourceDirs(
         useCasesRoot,
-        name => name.endsWith('UseCase.ts') && !name.startsWith('index'),
+        (name) => name.endsWith("UseCase.ts") && !name.startsWith("index"),
       );
 
       for (const { dir, files } of sourceDirs) {
-        const testDir = join(dir, '__tests__');
-        entries.push(await buildEntry({
-          projectRoot,
-          sourceDir:   dir,
-          sourceFiles: files,
-          testDir,
-          ruleName:    'use-cases',
-          module:      moduleName,
-          workspace:   'backend',
-        }));
+        const testDir = join(dir, "__tests__");
+        entries.push(
+          await buildEntry({
+            projectRoot,
+            sourceDir: dir,
+            sourceFiles: files,
+            testDir,
+            ruleName: "use-cases",
+            module: moduleName,
+            workspace: "backend",
+          }),
+        );
       }
     }
   }
@@ -220,50 +256,68 @@ async function mapCleanArchSources(projectRoot, paths) {
   // ── Frontend : composants + hooks ────────────────────────────────────────────
   if (paths.featuresDir) {
     const featureEntries = await readDirSafe(paths.featuresDir);
-    const featureNames   = featureEntries.filter(e => e.isDirectory()).map(e => e.name);
+    const featureNames = featureEntries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
 
     for (const featureName of featureNames) {
       const featureDir = join(paths.featuresDir, featureName);
 
       // Composants : un seul niveau (pas de récursion dans components/)
-      const componentsDir = join(featureDir, 'components');
+      const componentsDir = join(featureDir, "components");
       if (await fileExists(componentsDir)) {
         const componentFiles = (await readDirSafe(componentsDir))
-          .filter(e => e.isFile() && e.name.endsWith('.tsx') && !e.name.startsWith('_') && e.name !== 'index.tsx')
-          .map(e => e.name);
+          .filter(
+            (e) =>
+              e.isFile() &&
+              e.name.endsWith(".tsx") &&
+              !e.name.startsWith("_") &&
+              e.name !== "index.tsx",
+          )
+          .map((e) => e.name);
 
         if (componentFiles.length > 0) {
-          const testDir = join(componentsDir, '__tests__');
-          entries.push(await buildEntry({
-            projectRoot,
-            sourceDir:   componentsDir,
-            sourceFiles: componentFiles,
-            testDir,
-            ruleName:    'components',
-            module:      featureName,
-            workspace:   'frontend',
-          }));
+          const testDir = join(componentsDir, "__tests__");
+          entries.push(
+            await buildEntry({
+              projectRoot,
+              sourceDir: componentsDir,
+              sourceFiles: componentFiles,
+              testDir,
+              ruleName: "components",
+              module: featureName,
+              workspace: "frontend",
+            }),
+          );
         }
       }
 
       // Hooks : un seul niveau
-      const hooksDir = join(featureDir, 'hooks');
+      const hooksDir = join(featureDir, "hooks");
       if (await fileExists(hooksDir)) {
         const hookFiles = (await readDirSafe(hooksDir))
-          .filter(e => e.isFile() && e.name.endsWith('.ts') && e.name.startsWith('use') && e.name !== 'index.ts')
-          .map(e => e.name);
+          .filter(
+            (e) =>
+              e.isFile() &&
+              e.name.endsWith(".ts") &&
+              e.name.startsWith("use") &&
+              e.name !== "index.ts",
+          )
+          .map((e) => e.name);
 
         if (hookFiles.length > 0) {
-          const testDir = join(hooksDir, '__tests__');
-          entries.push(await buildEntry({
-            projectRoot,
-            sourceDir:   hooksDir,
-            sourceFiles: hookFiles,
-            testDir,
-            ruleName:    'hooks',
-            module:      featureName,
-            workspace:   'frontend',
-          }));
+          const testDir = join(hooksDir, "__tests__");
+          entries.push(
+            await buildEntry({
+              projectRoot,
+              sourceDir: hooksDir,
+              sourceFiles: hookFiles,
+              testDir,
+              ruleName: "hooks",
+              module: featureName,
+              workspace: "frontend",
+            }),
+          );
         }
       }
     }
@@ -294,28 +348,36 @@ async function mapFeatureBasedSources(projectRoot, paths) {
 async function mapMvcSources(projectRoot, paths) {
   /** @type {SourceDirEntry[]} */
   const entries = [];
-  const testsRoot = join(projectRoot, 'tests');
+  const testsRoot = join(projectRoot, "tests");
 
   // Controllers
   if (paths.controllersDir) {
     const sourceDirs = await walkSourceDirs(
       paths.controllersDir,
-      name => name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.startsWith('index'),
+      (name) =>
+        name.endsWith(".ts") &&
+        !name.endsWith(".d.ts") &&
+        !name.startsWith("index"),
     );
 
     for (const { dir, files } of sourceDirs) {
       // Pour MVC, les tests sont dans tests/controllers/ (pas colocalisés)
-      const relFromControllersRoot = relative(paths.controllersDir, dir).replace(/\\/g, '/');
-      const testDir = join(testsRoot, 'controllers', relFromControllersRoot);
-      entries.push(await buildEntry({
-        projectRoot,
-        sourceDir:   dir,
-        sourceFiles: files,
-        testDir,
-        ruleName:    'controllers',
-        module:      basename(dir),
-        workspace:   'backend',
-      }));
+      const relFromControllersRoot = relative(
+        paths.controllersDir,
+        dir,
+      ).replace(/\\/g, "/");
+      const testDir = join(testsRoot, "controllers", relFromControllersRoot);
+      entries.push(
+        await buildEntry({
+          projectRoot,
+          sourceDir: dir,
+          sourceFiles: files,
+          testDir,
+          ruleName: "controllers",
+          module: basename(dir),
+          workspace: "backend",
+        }),
+      );
     }
   }
 
@@ -323,21 +385,29 @@ async function mapMvcSources(projectRoot, paths) {
   if (paths.servicesDir) {
     const sourceDirs = await walkSourceDirs(
       paths.servicesDir,
-      name => name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.startsWith('index'),
+      (name) =>
+        name.endsWith(".ts") &&
+        !name.endsWith(".d.ts") &&
+        !name.startsWith("index"),
     );
 
     for (const { dir, files } of sourceDirs) {
-      const relFromServicesRoot = relative(paths.servicesDir, dir).replace(/\\/g, '/');
-      const testDir = join(testsRoot, 'services', relFromServicesRoot);
-      entries.push(await buildEntry({
-        projectRoot,
-        sourceDir:   dir,
-        sourceFiles: files,
-        testDir,
-        ruleName:    'services',
-        module:      basename(dir),
-        workspace:   'backend',
-      }));
+      const relFromServicesRoot = relative(paths.servicesDir, dir).replace(
+        /\\/g,
+        "/",
+      );
+      const testDir = join(testsRoot, "services", relFromServicesRoot);
+      entries.push(
+        await buildEntry({
+          projectRoot,
+          sourceDir: dir,
+          sourceFiles: files,
+          testDir,
+          ruleName: "services",
+          module: basename(dir),
+          workspace: "backend",
+        }),
+      );
     }
   }
 
@@ -358,20 +428,25 @@ async function mapNextjsSources(projectRoot, paths) {
   if (paths.pagesDir) {
     const sourceDirs = await walkSourceDirs(
       paths.pagesDir,
-      name => (name.endsWith('.tsx') || name.endsWith('.ts')) && !name.startsWith('_') && name !== 'index.tsx',
+      (name) =>
+        (name.endsWith(".tsx") || name.endsWith(".ts")) &&
+        !name.startsWith("_") &&
+        name !== "index.tsx",
     );
 
     for (const { dir, files } of sourceDirs) {
-      const testDir = join(dir, '__tests__');
-      entries.push(await buildEntry({
-        projectRoot,
-        sourceDir:   dir,
-        sourceFiles: files,
-        testDir,
-        ruleName:    'pages',
-        module:      relative(paths.pagesDir, dir).replace(/\\/g, '/') || 'root',
-        workspace:   'frontend',
-      }));
+      const testDir = join(dir, "__tests__");
+      entries.push(
+        await buildEntry({
+          projectRoot,
+          sourceDir: dir,
+          sourceFiles: files,
+          testDir,
+          ruleName: "pages",
+          module: relative(paths.pagesDir, dir).replace(/\\/g, "/") || "root",
+          workspace: "frontend",
+        }),
+      );
     }
   }
 
@@ -389,32 +464,42 @@ async function mapMonorepoSources(projectRoot, paths) {
   /** @type {SourceDirEntry[]} */
   const entries = [];
 
-  const rootsToScan = [paths.modulesDir /* packages/ */, paths.featuresDir /* apps/ */].filter(Boolean);
+  const rootsToScan = [
+    paths.modulesDir /* packages/ */,
+    paths.featuresDir /* apps/ */,
+  ].filter(Boolean);
 
   for (const root of rootsToScan) {
     const packageEntries = await readDirSafe(root);
-    const packageNames   = packageEntries.filter(e => e.isDirectory()).map(e => e.name);
+    const packageNames = packageEntries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
 
     for (const pkgName of packageNames) {
-      const srcDir = join(root, pkgName, 'src');
-      if (!await fileExists(srcDir)) continue;
+      const srcDir = join(root, pkgName, "src");
+      if (!(await fileExists(srcDir))) continue;
 
       const sourceDirs = await walkSourceDirs(
         srcDir,
-        name => name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.startsWith('index'),
+        (name) =>
+          name.endsWith(".ts") &&
+          !name.endsWith(".d.ts") &&
+          !name.startsWith("index"),
       );
 
       for (const { dir, files } of sourceDirs) {
-        const testDir = join(dir, '__tests__');
-        entries.push(await buildEntry({
-          projectRoot,
-          sourceDir:   dir,
-          sourceFiles: files,
-          testDir,
-          ruleName:    'packages',
-          module:      pkgName,
-          workspace:   'all',
-        }));
+        const testDir = join(dir, "__tests__");
+        entries.push(
+          await buildEntry({
+            projectRoot,
+            sourceDir: dir,
+            sourceFiles: files,
+            testDir,
+            ruleName: "packages",
+            module: pkgName,
+            workspace: "all",
+          }),
+        );
       }
     }
   }
@@ -442,19 +527,19 @@ export async function buildSourceMap(profile) {
   let entries = [];
 
   switch (type) {
-    case 'clean-architecture':
+    case "clean-architecture":
       entries = await mapCleanArchSources(paths.root, paths);
       break;
-    case 'feature-based':
+    case "feature-based":
       entries = await mapFeatureBasedSources(paths.root, paths);
       break;
-    case 'mvc-layered':
+    case "mvc-layered":
       entries = await mapMvcSources(paths.root, paths);
       break;
-    case 'nextjs':
+    case "nextjs":
       entries = await mapNextjsSources(paths.root, paths);
       break;
-    case 'monorepo':
+    case "monorepo":
       entries = await mapMonorepoSources(paths.root, paths);
       break;
     default:

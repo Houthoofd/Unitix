@@ -17,7 +17,7 @@ import { detectFrameworks } from "./framework-detector.mjs";
 import { detectPaths } from "./path-detector.mjs";
 import { buildTestStrategy } from "./test-strategy-builder.mjs";
 import { buildSourceMap } from "./source-mapper.mjs";
-import { logger } from "../logger.mjs";
+import { logger } from "../utils/logger.mjs";
 
 /** @import { ArchitectureProfile, FrameworkInfo, RawDetectedPaths, DetectedPaths, SourceDirEntry } from '../types.mjs' */
 
@@ -84,11 +84,11 @@ function scoreArchitectures(frameworks, paths) {
   // ── Pénalité croisée : éviter les faux positifs feature-based sur les projets clean-arch ─
   // Si des signaux forts de clean-arch sont présents, réduire le score feature-based
   if (paths.modulesDir && paths.hasUseCasesDir) {
-    scores['feature-based'] -= 4;
+    scores["feature-based"] -= 4;
   }
   // Éviter que hasViteConfig booste feature-based sur un projet NestJS+Vite
-  if (frameworks.backend === 'nestjs' && paths.hasViteConfig) {
-    scores['feature-based'] -= 2;
+  if (frameworks.backend === "nestjs" && paths.hasViteConfig) {
+    scores["feature-based"] -= 2;
   }
   // S'assurer que les scores ne sont pas négatifs
   for (const key of Object.keys(scores)) {
@@ -164,13 +164,23 @@ function resolvedPaths(projectRoot, raw) {
  * @returns {import('../types.mjs').SourceMapStats}
  */
 function computeSourceMapStats(sourceMap) {
-  const totalSourceFiles   = sourceMap.reduce((s, e) => s + e.sourceFiles.length, 0);
-  const totalTestsExisting = sourceMap.reduce((s, e) => s + e.existingTestCount, 0);
-  const totalTestsMissing  = sourceMap.reduce((s, e) => s + e.missingTestCount, 0);
-  const totalDesync        = sourceMap.reduce((s, e) => s + (e.desyncCount ?? 0), 0);
-  const coveragePercent    = totalSourceFiles > 0
-    ? Math.round((totalTestsExisting / totalSourceFiles) * 100)
-    : 0;
+  const totalSourceFiles = sourceMap.reduce(
+    (s, e) => s + e.sourceFiles.length,
+    0,
+  );
+  const totalTestsExisting = sourceMap.reduce(
+    (s, e) => s + e.existingTestCount,
+    0,
+  );
+  const totalTestsMissing = sourceMap.reduce(
+    (s, e) => s + e.missingTestCount,
+    0,
+  );
+  const totalDesync = sourceMap.reduce((s, e) => s + (e.desyncCount ?? 0), 0);
+  const coveragePercent =
+    totalSourceFiles > 0
+      ? Math.round((totalTestsExisting / totalSourceFiles) * 100)
+      : 0;
 
   return {
     totalDirs: sourceMap.length,
@@ -250,11 +260,13 @@ export async function detectArchitecture(projectRoot) {
 
   logger.info(
     `Source map : ${sourceMapStats.totalDirs} dossiers, ` +
-    `${sourceMapStats.totalSourceFiles} sources, ` +
-    `${sourceMapStats.totalTestsExisting} tests existants, ` +
-    `${sourceMapStats.totalTestsMissing} à créer` +
-    (sourceMapStats.totalDesync > 0 ? `, ${sourceMapStats.totalDesync} désynchronisés` : '') +
-    ` (couverture : ${sourceMapStats.coveragePercent}%)`
+      `${sourceMapStats.totalSourceFiles} sources, ` +
+      `${sourceMapStats.totalTestsExisting} tests existants, ` +
+      `${sourceMapStats.totalTestsMissing} à créer` +
+      (sourceMapStats.totalDesync > 0
+        ? `, ${sourceMapStats.totalDesync} désynchronisés`
+        : "") +
+      ` (couverture : ${sourceMapStats.coveragePercent}%)`,
   );
 
   return {

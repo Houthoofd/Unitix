@@ -1,7 +1,7 @@
 /**
  * types.mjs
  * ─────────────────────────────────────────────────────────────────────────────
- * Définitions de types JSDoc pour @clubmanager/test-generator
+ * Définitions de types JSDoc pour @houthoofd/unitix
  *
  * Ce fichier constitue l'API publique du futur package npm.
  * Tous les modules du core importent uniquement ces types — jamais les

@@ -9,9 +9,9 @@
  * @module detectors/path-detector
  */
 
-import { readdir } from 'fs/promises';
-import { join }    from 'path';
-import { fileExists } from '../fs-utils.mjs';
+import { readdir } from "fs/promises";
+import { join } from "path";
+import { fileExists } from "../utils/fs-utils.mjs";
 
 /** @import { RawDetectedPaths } from '../types.mjs' */
 
@@ -27,7 +27,7 @@ import { fileExists } from '../fs-utils.mjs';
 async function listSubDirs(dirPath) {
   try {
     const entries = await readdir(dirPath, { withFileTypes: true });
-    return entries.filter(e => e.isDirectory()).map(e => e.name);
+    return entries.filter((e) => e.isDirectory()).map((e) => e.name);
   } catch {
     return [];
   }
@@ -42,7 +42,7 @@ async function listSubDirs(dirPath) {
  */
 async function firstExisting(candidates) {
   for (const p of candidates) {
-    if (p && await fileExists(p)) return p;
+    if (p && (await fileExists(p))) return p;
   }
   return null;
 }
@@ -77,109 +77,128 @@ export async function detectPaths(projectRoot) {
 
   // ── Répertoires racines courants ─────────────────────────────────────────────
 
-  const srcDir      = await firstExisting([join(r, 'src')]);
-  const backendDir  = await firstExisting([join(r, 'backend'), join(r, 'server'), join(r, 'api')]);
-  const frontendDir = await firstExisting([join(r, 'frontend'), join(r, 'client'), join(r, 'web')]);
+  const srcDir = await firstExisting([join(r, "src")]);
+  const backendDir = await firstExisting([
+    join(r, "backend"),
+    join(r, "server"),
+    join(r, "api"),
+  ]);
+  const frontendDir = await firstExisting([
+    join(r, "frontend"),
+    join(r, "client"),
+    join(r, "web"),
+  ]);
 
   // ── Clean Architecture — modules/ ────────────────────────────────────────────
 
   const modulesDir = await firstExisting([
-    join(r, 'src', 'modules'),
-    backendDir  ? join(backendDir,  'src', 'modules') : null,
+    join(r, "src", "modules"),
+    backendDir ? join(backendDir, "src", "modules") : null,
     frontendDir ? null : null, // frontend n'a pas de modules backend
   ]);
 
   // ── Feature-Based — features/ ────────────────────────────────────────────────
 
   const featuresDir = await firstExisting([
-    join(r, 'src', 'features'),
-    frontendDir ? join(frontendDir, 'src', 'features') : null,
-    join(r, 'frontend', 'src', 'features'),
+    join(r, "src", "features"),
+    frontendDir ? join(frontendDir, "src", "features") : null,
+    join(r, "frontend", "src", "features"),
   ]);
 
   // ── MVC — controllers/ et services/ ─────────────────────────────────────────
 
   const controllersDir = await firstExisting([
-    join(r, 'src', 'controllers'),
-    srcDir      ? join(srcDir,      'controllers') : null,
-    backendDir  ? join(backendDir,  'src', 'controllers') : null,
+    join(r, "src", "controllers"),
+    srcDir ? join(srcDir, "controllers") : null,
+    backendDir ? join(backendDir, "src", "controllers") : null,
   ]);
 
   const servicesDir = await firstExisting([
-    join(r, 'src', 'services'),
-    srcDir      ? join(srcDir,      'services') : null,
-    backendDir  ? join(backendDir,  'src', 'services') : null,
+    join(r, "src", "services"),
+    srcDir ? join(srcDir, "services") : null,
+    backendDir ? join(backendDir, "src", "services") : null,
   ]);
 
   // ── Next.js — pages/ et app/ ─────────────────────────────────────────────────
 
-  const pagesDir      = await firstExisting([join(r, 'pages'),     join(r, 'src', 'pages')]);
-  const appRouterDir  = await firstExisting([join(r, 'app'),       join(r, 'src', 'app')]);
+  const pagesDir = await firstExisting([
+    join(r, "pages"),
+    join(r, "src", "pages"),
+  ]);
+  const appRouterDir = await firstExisting([
+    join(r, "app"),
+    join(r, "src", "app"),
+  ]);
 
   // ── Monorepo — packages/ et apps/ ────────────────────────────────────────────
 
-  const packagesDir = await firstExisting([join(r, 'packages')]);
-  const appsDir     = await firstExisting([join(r, 'apps')]);
+  const packagesDir = await firstExisting([join(r, "packages")]);
+  const appsDir = await firstExisting([join(r, "apps")]);
 
   // ── Tests existants ───────────────────────────────────────────────────────────
 
-  const testsDir = await firstExisting([join(r, 'tests'), join(r, 'test'), join(r, '__tests__')]);
+  const testsDir = await firstExisting([
+    join(r, "tests"),
+    join(r, "test"),
+    join(r, "__tests__"),
+  ]);
 
   // ── Signaux DDD (use-cases + domain) ─────────────────────────────────────────
 
   let hasUseCasesDir = false;
-  let hasDomainDir   = false;
+  let hasDomainDir = false;
 
   if (modulesDir) {
     // Cherche application/use-cases dans les premiers modules
-    hasUseCasesDir = await hasSubPathInModules(modulesDir, join('application', 'use-cases'));
+    hasUseCasesDir = await hasSubPathInModules(
+      modulesDir,
+      join("application", "use-cases"),
+    );
     // Cherche domain/ dans les premiers modules
-    hasDomainDir   = await hasSubPathInModules(modulesDir, 'domain');
+    hasDomainDir = await hasSubPathInModules(modulesDir, "domain");
   }
 
   // Fallback : src/domain ou backend/src/domain
   if (!hasDomainDir) {
-    hasDomainDir = !!(
-      await firstExisting([
-        join(r, 'src', 'domain'),
-        backendDir ? join(backendDir, 'src', 'domain') : null,
-      ])
-    );
+    hasDomainDir = !!(await firstExisting([
+      join(r, "src", "domain"),
+      backendDir ? join(backendDir, "src", "domain") : null,
+    ]));
   }
 
   // ── Fichiers de configuration ─────────────────────────────────────────────────
 
-  const hasNestCliJson = await fileExists(join(r, 'nest-cli.json'));
+  const hasNestCliJson = await fileExists(join(r, "nest-cli.json"));
 
   const hasNextConfig = !!(await firstExisting([
-    join(r, 'next.config.js'),
-    join(r, 'next.config.mjs'),
-    join(r, 'next.config.ts'),
+    join(r, "next.config.js"),
+    join(r, "next.config.mjs"),
+    join(r, "next.config.ts"),
   ]));
 
   const hasViteConfig = !!(await firstExisting([
-    join(r, 'vite.config.ts'),
-    join(r, 'vite.config.js'),
-    frontendDir ? join(frontendDir, 'vite.config.ts') : null,
-    frontendDir ? join(frontendDir, 'vite.config.js') : null,
+    join(r, "vite.config.ts"),
+    join(r, "vite.config.js"),
+    frontendDir ? join(frontendDir, "vite.config.ts") : null,
+    frontendDir ? join(frontendDir, "vite.config.js") : null,
   ]));
 
-  const hasAngularJson = await fileExists(join(r, 'angular.json'));
+  const hasAngularJson = await fileExists(join(r, "angular.json"));
 
   const hasJestConfig = !!(await firstExisting([
-    join(r, 'jest.config.js'),
-    join(r, 'jest.config.ts'),
-    join(r, 'jest.config.mjs'),
-    join(r, 'jest.config.cjs'),
-    backendDir ? join(backendDir, 'jest.config.js') : null,
-    backendDir ? join(backendDir, 'jest.config.ts') : null,
+    join(r, "jest.config.js"),
+    join(r, "jest.config.ts"),
+    join(r, "jest.config.mjs"),
+    join(r, "jest.config.cjs"),
+    backendDir ? join(backendDir, "jest.config.js") : null,
+    backendDir ? join(backendDir, "jest.config.ts") : null,
   ]));
 
   const hasVitestConfig = !!(await firstExisting([
-    join(r, 'vitest.config.ts'),
-    join(r, 'vitest.config.js'),
-    frontendDir ? join(frontendDir, 'vitest.config.ts') : null,
-    frontendDir ? join(frontendDir, 'vitest.config.js') : null,
+    join(r, "vitest.config.ts"),
+    join(r, "vitest.config.js"),
+    frontendDir ? join(frontendDir, "vitest.config.ts") : null,
+    frontendDir ? join(frontendDir, "vitest.config.js") : null,
   ]));
 
   return {

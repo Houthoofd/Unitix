@@ -14,23 +14,23 @@
 import { dirname } from "path";
 import { readFile } from "node:fs/promises";
 
-import { computeFileHash, extractStoredHash } from "./hash-utils.mjs";
+import { computeFileHash, extractStoredHash } from "../utils/hash-utils.mjs";
 import {
   hasSyncMarkers,
   extractManualTail,
   mergeSyncContent,
   countNonEmptyLines,
-} from "./sync-merger.mjs";
+} from "../utils/sync-merger.mjs";
 
-import { scanBackendUseCases } from "./scanners/backend-scanner.mjs";
-import { scanFrontendFiles } from "./scanners/frontend-scanner.mjs";
-import { generateBackendTest } from "./generators/backend-generator.mjs";
-import { generateFrontendTest } from "./generators/frontend-generator.mjs";
-import { ensureDir, writeFileSafe, fileExists } from "./fs-utils.mjs";
-import { logger } from "./logger.mjs";
-import { detectArchitecture } from "./detectors/architecture-detector.mjs";
+import { scanBackendUseCases } from "../scanners/backend-scanner.mjs";
+import { scanFrontendFiles } from "../scanners/frontend-scanner.mjs";
+import { generateBackendTest } from "../generators/backend-generator.mjs";
+import { generateFrontendTest } from "../generators/frontend-generator.mjs";
+import { ensureDir, writeFileSafe, fileExists } from "../utils/fs-utils.mjs";
+import { logger } from "../utils/logger.mjs";
+import { detectArchitecture } from "../detectors/architecture-detector.mjs";
 
-/** @import { GeneratorConfig, GenerationResult, GenerationSummary, ArchitectureProfile } from './types.mjs' */
+/** @import { GeneratorConfig, GenerationResult, GenerationSummary, ArchitectureProfile } from '../types.mjs' */
 
 // ─── Auto-config depuis un ArchitectureProfile ───────────────────────────────
 

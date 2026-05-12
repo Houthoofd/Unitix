@@ -9,7 +9,7 @@
 
 import { dirname, basename, join, relative } from "path";
 
-import { computeFileHash } from "../hash-utils.mjs";
+import { computeFileHash } from "../utils/hash-utils.mjs";
 
 import { parseComponent } from "../parsers/component-parser.mjs";
 import { parseHook } from "../parsers/hook-parser.mjs";

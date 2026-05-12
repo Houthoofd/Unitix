@@ -1,7 +1,7 @@
 /**
  * @file logger.mjs
  * @description Logger avec output coloré ANSI. Zéro dépendances externes.
- * Fait partie du générateur de tests @clubmanager/test-generator.
+ * Fait partie du générateur de tests @houthoofd/unitix.
  */
 
 // ─── Codes ANSI ──────────────────────────────────────────────────────────────

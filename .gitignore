@@ -3,3 +3,11 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Unitix cache (v0.6.0)
+.unitix-cache.json
+
+# Environnement
+.env
+.env.local
+*.local

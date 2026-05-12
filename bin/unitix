@@ -24,10 +24,10 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { parseArgs, printHelp } from "../cli.mjs";
-import { generateTests, generateTestsAuto } from "../engine.mjs";
+import { parseArgs, printHelp } from "../core/cli.mjs";
+import { generateTests, generateTestsAuto } from "../core/engine.mjs";
 import { detectArchitecture } from "../detectors/architecture-detector.mjs";
-import { logger, setQuiet, setNoColor } from "../logger.mjs";
+import { logger, setQuiet, setNoColor } from "../utils/logger.mjs";
 import { resolve } from "path";
 
 const options = parseArgs(process.argv.slice(2));
