@@ -6,9 +6,11 @@
  * @module parsers/component-parser
  */
 
-import { parse }    from '@typescript-eslint/typescript-estree';
-import { readFile } from 'fs/promises';
-import path         from 'path';
+import { parse } from "@typescript-eslint/typescript-estree";
+import { readFile } from "fs/promises";
+import path from "path";
+
+import { formatParseError } from "../utils/parse-error.mjs";
 
 /** @import { ComponentInfo } from '../types.mjs' */
 
@@ -24,14 +26,14 @@ import path         from 'path';
  * @returns {string}
  */
 function extractFeature(filePath) {
-  const normalized = filePath.replace(/\\/g, '/');
+  const normalized = filePath.replace(/\\/g, "/");
 
   const featuresMatch = normalized.match(/features\/([^/]+)\//);
   if (featuresMatch) return featuresMatch[1];
 
-  if (normalized.includes('/shared/')) return 'shared';
+  if (normalized.includes("/shared/")) return "shared";
 
-  return 'unknown';
+  return "unknown";
 }
 
 /**
@@ -45,41 +47,44 @@ function extractPropsFields(astBody) {
     let membersBody = null;
 
     // Cas 1 : interface XxxProps { ... }  (exportée ou non)
-    if (node.type === 'TSInterfaceDeclaration') {
-      const name = node.id?.name ?? '';
-      if (name.includes('Props')) {
+    if (node.type === "TSInterfaceDeclaration") {
+      const name = node.id?.name ?? "";
+      if (name.includes("Props")) {
         membersBody = node.body?.body ?? [];
       }
     }
 
     // Cas 2 : export interface XxxProps { ... }
     if (
-      node.type === 'ExportNamedDeclaration' &&
-      node.declaration?.type === 'TSInterfaceDeclaration'
+      node.type === "ExportNamedDeclaration" &&
+      node.declaration?.type === "TSInterfaceDeclaration"
     ) {
-      const name = node.declaration.id?.name ?? '';
-      if (name.includes('Props')) {
+      const name = node.declaration.id?.name ?? "";
+      if (name.includes("Props")) {
         membersBody = node.declaration.body?.body ?? [];
       }
     }
 
     // Cas 3 : type XxxProps = { ... }
-    if (node.type === 'TSTypeAliasDeclaration') {
-      const name = node.id?.name ?? '';
-      if (name.includes('Props') && node.typeAnnotation?.type === 'TSTypeLiteral') {
+    if (node.type === "TSTypeAliasDeclaration") {
+      const name = node.id?.name ?? "";
+      if (
+        name.includes("Props") &&
+        node.typeAnnotation?.type === "TSTypeLiteral"
+      ) {
         membersBody = node.typeAnnotation.members ?? [];
       }
     }
 
     // Cas 4 : export type XxxProps = { ... }
     if (
-      node.type === 'ExportNamedDeclaration' &&
-      node.declaration?.type === 'TSTypeAliasDeclaration'
+      node.type === "ExportNamedDeclaration" &&
+      node.declaration?.type === "TSTypeAliasDeclaration"
     ) {
-      const name = node.declaration.id?.name ?? '';
+      const name = node.declaration.id?.name ?? "";
       if (
-        name.includes('Props') &&
-        node.declaration.typeAnnotation?.type === 'TSTypeLiteral'
+        name.includes("Props") &&
+        node.declaration.typeAnnotation?.type === "TSTypeLiteral"
       ) {
         membersBody = node.declaration.typeAnnotation.members ?? [];
       }
@@ -87,8 +92,8 @@ function extractPropsFields(astBody) {
 
     if (membersBody) {
       return membersBody
-        .filter((m) => m.type === 'TSPropertySignature')
-        .map((m) => m.key?.name ?? m.key?.value ?? '')
+        .filter((m) => m.type === "TSPropertySignature")
+        .map((m) => m.key?.name ?? m.key?.value ?? "")
         .filter(Boolean);
     }
   }
@@ -110,7 +115,7 @@ function resolveDefaultExportIdentifier(identifierName, astBody) {
   for (const node of astBody) {
     // function ComponentName() { ... }
     if (
-      node.type === 'FunctionDeclaration' &&
+      node.type === "FunctionDeclaration" &&
       node.id?.name === identifierName &&
       /^[A-Z]/.test(identifierName)
     ) {
@@ -118,15 +123,13 @@ function resolveDefaultExportIdentifier(identifierName, astBody) {
     }
 
     // const ComponentName = () => { ... }  ou  const ComponentName = function() { ... }
-    if (node.type === 'VariableDeclaration') {
+    if (node.type === "VariableDeclaration") {
       for (const decl of node.declarations ?? []) {
         if (
           decl.id?.name === identifierName &&
           /^[A-Z]/.test(identifierName) &&
-          (
-            decl.init?.type === 'ArrowFunctionExpression' ||
-            decl.init?.type === 'FunctionExpression'
-          )
+          (decl.init?.type === "ArrowFunctionExpression" ||
+            decl.init?.type === "FunctionExpression")
         ) {
           return identifierName;
         }
@@ -154,23 +157,21 @@ function resolveDefaultExportIdentifier(identifierName, astBody) {
 function findComponentName(astBody, fileBaseName) {
   for (const node of astBody) {
     // ── Export nommé ──────────────────────────────────────────────────────
-    if (node.type === 'ExportNamedDeclaration') {
+    if (node.type === "ExportNamedDeclaration") {
       // export function ComponentName(...)
-      if (node.declaration?.type === 'FunctionDeclaration') {
-        const name = node.declaration.id?.name ?? '';
+      if (node.declaration?.type === "FunctionDeclaration") {
+        const name = node.declaration.id?.name ?? "";
         if (/^[A-Z]/.test(name)) return name;
       }
 
       // export const ComponentName = (...) => ...
-      if (node.declaration?.type === 'VariableDeclaration') {
+      if (node.declaration?.type === "VariableDeclaration") {
         for (const decl of node.declaration.declarations ?? []) {
-          const name = decl.id?.name ?? '';
+          const name = decl.id?.name ?? "";
           if (
             /^[A-Z]/.test(name) &&
-            (
-              decl.init?.type === 'ArrowFunctionExpression' ||
-              decl.init?.type === 'FunctionExpression'
-            )
+            (decl.init?.type === "ArrowFunctionExpression" ||
+              decl.init?.type === "FunctionExpression")
           ) {
             return name;
           }
@@ -179,22 +180,22 @@ function findComponentName(astBody, fileBaseName) {
     }
 
     // ── Export par défaut ──────────────────────────────────────────────────
-    if (node.type === 'ExportDefaultDeclaration') {
+    if (node.type === "ExportDefaultDeclaration") {
       // export default function ComponentName() { ... }
-      if (node.declaration?.type === 'FunctionDeclaration') {
-        const name = node.declaration.id?.name ?? '';
+      if (node.declaration?.type === "FunctionDeclaration") {
+        const name = node.declaration.id?.name ?? "";
         // La fonction peut être anonyme → utiliser le nom du fichier comme fallback
         return name || fileBaseName;
       }
 
       // export default () => { ... }
-      if (node.declaration?.type === 'ArrowFunctionExpression') {
+      if (node.declaration?.type === "ArrowFunctionExpression") {
         return fileBaseName;
       }
 
       // export default ComponentName;  (Identifier référençant une déclaration plus haut)
-      if (node.declaration?.type === 'Identifier') {
-        const refName = node.declaration.name ?? '';
+      if (node.declaration?.type === "Identifier") {
+        const refName = node.declaration.name ?? "";
         if (/^[A-Z]/.test(refName)) {
           // On confirme qu'il existe bien une déclaration avec ce nom
           return resolveDefaultExportIdentifier(refName, astBody) ?? refName;
@@ -226,9 +227,11 @@ export async function parseComponent(filePath) {
   // ── Lecture du fichier ─────────────────────────────────────────────────────
   let code;
   try {
-    code = await readFile(filePath, 'utf-8');
+    code = await readFile(filePath, "utf-8");
   } catch (err) {
-    console.warn(`[component-parser] Impossible de lire le fichier : ${filePath} — ${err.message}`);
+    console.warn(
+      `[component-parser] Impossible de lire le fichier : ${filePath} — ${err.message}`,
+    );
     return null;
   }
 
@@ -237,7 +240,8 @@ export async function parseComponent(filePath) {
   try {
     ast = parse(code, { jsx: true, loc: true, range: true });
   } catch (err) {
-    console.warn(`[component-parser] Erreur de parsing AST : ${filePath} — ${err.message}`);
+    const details = formatParseError(err, code, filePath);
+    console.warn(`[component-parser] Erreur de parsing AST :\n${details}`);
     return null;
   }
 
@@ -248,25 +252,23 @@ export async function parseComponent(filePath) {
   const componentName = findComponentName(ast.body, fileBaseName);
 
   if (!componentName) {
-    console.warn(`[component-parser] Aucun composant exporté trouvé dans : ${filePath}`);
+    console.warn(
+      `[component-parser] Aucun composant exporté trouvé dans : ${filePath}`,
+    );
     return null;
   }
 
   // ── Extraction des métadonnées ─────────────────────────────────────────────
-  const feature     = extractFeature(filePath);
+  const feature = extractFeature(filePath);
   const propsFields = extractPropsFields(ast.body);
 
   // Détection des hooks utilisés via analyse du texte brut (plus simple et robuste)
-  const usesTranslation = code.includes('useTranslation');
-  const usesRouter      = (
-    code.includes('useNavigate') ||
-    code.includes('useParams')   ||
-    code.includes('useLocation')
-  );
-  const usesQuery       = (
-    code.includes('useQuery')    ||
-    code.includes('useMutation')
-  );
+  const usesTranslation = code.includes("useTranslation");
+  const usesRouter =
+    code.includes("useNavigate") ||
+    code.includes("useParams") ||
+    code.includes("useLocation");
+  const usesQuery = code.includes("useQuery") || code.includes("useMutation");
 
   return {
     filePath,

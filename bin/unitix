@@ -30,8 +30,14 @@ import { detectArchitecture } from "../detectors/architecture-detector.mjs";
 import { runInit } from "../core/init.mjs";
 import { logger, setQuiet, setNoColor } from "../utils/logger.mjs";
 import { resolve } from "path";
+import { watch } from "fs";
 
 const options = parseArgs(process.argv.slice(2));
+
+// Résoudre la racine du projet : --root=<path> ou CWD
+const projectRoot = options.root
+  ? resolve(process.cwd(), options.root)
+  : resolve(process.cwd());
 
 // Mode JSON : rediriger les logs vers stderr pour garder stdout propre
 if (options.json) setQuiet(true);
@@ -47,7 +53,7 @@ if (options.help) {
 // ─── Mode : init ─────────────────────────────────────────────────────────────────
 
 if (options.init) {
-  await runInit(resolve(process.cwd()), {
+  await runInit(projectRoot, {
     noColor: options.noColor,
     verbose: options.verbose,
   });
@@ -216,7 +222,7 @@ function printProfile(profile) {
 
 if (options.detect) {
   try {
-    const profile = await detectArchitecture(resolve(process.cwd()));
+    const profile = await detectArchitecture(projectRoot);
 
     // Mode JSON : sortie machine-readable sur stdout
     if (options.json) {
@@ -259,9 +265,8 @@ if (options.detect) {
 
 if (options.auto) {
   try {
-    const { profile, summary } = await generateTestsAuto(
-      resolve(process.cwd()),
-      {
+    const runAutoOnce = async () => {
+      const { profile, summary } = await generateTestsAuto(projectRoot, {
         workspace: options.workspace,
         module: options.module,
         sprint: options.sprint,
@@ -270,8 +275,12 @@ if (options.auto) {
         skipExisting: options.skipExisting,
         verbose: options.verbose,
         sync: options.sync,
-      },
-    );
+        noCache: options.noCache,
+      });
+      return { profile, summary };
+    };
+
+    const { profile, summary } = await runAutoOnce();
 
     if (!options.json && options.verbose) printProfile(profile);
 
@@ -313,6 +322,73 @@ if (options.auto) {
           `n'est pas encore implémentée pour ce type.\n` +
           `   Utilisez un fichier unitix.config.mjs pour une configuration manuelle.\n`,
       );
+    }
+
+    // ── Mode --watch ─────────────────────────────────────────────────
+    if (options.watch) {
+      const watchDirs = [];
+      if (profile.paths?.modulesDir) watchDirs.push(profile.paths.modulesDir);
+      if (profile.paths?.featuresDir) watchDirs.push(profile.paths.featuresDir);
+      if (profile.paths?.sourceDir) watchDirs.push(profile.paths.sourceDir);
+
+      if (watchDirs.length === 0) {
+        logger.warn(
+          "--watch : aucun répertoire source détecté, surveillance impossible.",
+        );
+      } else {
+        logger.info(
+          `Mode --watch actif. Surveillance de :\n${watchDirs.map((d) => `  ${d}`).join("\n")}`,
+        );
+        logger.info("Appuyez sur Ctrl+C pour arrêter.");
+
+        /** @type {Map<string, NodeJS.Timeout>} */
+        const debounceTimers = new Map();
+
+        for (const dir of watchDirs) {
+          try {
+            watch(dir, { recursive: true }, (_event, filename) => {
+              if (!filename) return;
+              // Filtrer sur les fichiers TypeScript uniquement
+              if (!filename.endsWith(".ts") && !filename.endsWith(".tsx"))
+                return;
+
+              const key = filename;
+              const existing = debounceTimers.get(key);
+              if (existing) clearTimeout(existing);
+
+              debounceTimers.set(
+                key,
+                setTimeout(async () => {
+                  debounceTimers.delete(key);
+                  logger.info(
+                    `Fichier modifié : ${filename} — régénération...`,
+                  );
+                  try {
+                    await runAutoOnce();
+                  } catch (watchErr) {
+                    logger.error(
+                      `Erreur lors de la régénération : ${watchErr.message}`,
+                    );
+                  }
+                }, 500),
+              );
+            });
+          } catch (watchErr) {
+            logger.warn(
+              `--watch : impossible de surveiller ${dir} — ${watchErr.message}`,
+            );
+          }
+        }
+
+        // Maintenir le processus en vie
+        process.on("SIGINT", () => {
+          logger.info("\nMode --watch arrêté.");
+          process.exit(0);
+        });
+
+        // Bloquer indefiniment (le watcher garde le event loop actif)
+        await new Promise(() => {}); // jamais résolu
+      }
     }
   } catch (err) {
     console.error("\n❌ Fatal error:", err.message);

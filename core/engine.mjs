@@ -11,7 +11,7 @@
  * @module core/engine
  */
 
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { readFile } from "node:fs/promises";
 
 import { computeFileHash, extractStoredHash } from "../utils/hash-utils.mjs";
@@ -21,6 +21,13 @@ import {
   mergeSyncContent,
   countNonEmptyLines,
 } from "../utils/sync-merger.mjs";
+import {
+  loadCache,
+  saveCache,
+  getCachedGeneration,
+  setCachedGeneration,
+  getCacheStats,
+} from "../utils/ast-cache.mjs";
 
 import { scanBackendUseCases } from "../scanners/backend-scanner.mjs";
 import { scanFrontendFiles } from "../scanners/frontend-scanner.mjs";
@@ -59,6 +66,7 @@ function buildConfigFromProfile(profile, overrides = {}) {
     verbose: overrides.verbose ?? false,
     sync: overrides.sync ?? false,
     coverageLevel: overrides.coverageLevel ?? "standard",
+    noCache: overrides.noCache ?? false,
   };
 
   const ws = config.workspace;
@@ -255,6 +263,35 @@ async function processGenerated(generated, sourceFilePath, config) {
   return result;
 }
 
+/**
+ * Exécute `fn(item)` sur chaque élément de `items` avec au plus `concurrency`
+ * appels simultanés. Préserve l'ordre des résultats.
+ *
+ * @template T, R
+ * @param {T[]} items
+ * @param {(item: T) => Promise<R>} fn
+ * @param {number} [concurrency=12]
+ * @returns {Promise<R[]>}
+ */
+async function runConcurrent(items, fn, concurrency = 12) {
+  if (items.length === 0) return [];
+
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++; // atomique en JS (single-threaded)
+      results[index] = await fn(items[index]);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.allSettled(Array.from({ length: workerCount }, worker));
+
+  return results;
+}
+
 // ─── Export principal ─────────────────────────────────────────────────────────
 
 /**
@@ -273,6 +310,82 @@ export async function generateTests(config) {
   /** @type {GenerationResult[]} */
   const results = [];
 
+  // ── Chargement du cache ───────────────────────────────────────────────────
+  const cacheFilePath = join(
+    config.projectRoot ?? process.cwd(),
+    ".unitix-cache.json",
+  );
+  const useCache = !config.noCache;
+  const cache = useCache ? await loadCache(cacheFilePath) : {};
+
+  if (useCache) {
+    const stats = getCacheStats(cache);
+    logger.debug(`Cache chargé : ${stats.total} entrée(s)`, config.verbose);
+  }
+
+  /** Indicateur pour savoir si le cache a été modifié et doit être sauvegardé */
+  let cacheModified = false;
+
+  // ── Helper : générer un fichier (avec cache) ──────────────────────────────
+  /**
+   * Appelle le générateur approprié pour un fichier source, en utilisant
+   * le cache si disponible.
+   *
+   * @param {string} filePath
+   * @param {'backend'|'frontend'} workspace
+   * @param {string} [fileType]   - Pour frontend : 'component' | 'hook'
+   * @returns {Promise<{ content: string, testFilePath: string } | null>}
+   */
+  async function getGenerated(filePath, workspace, fileType) {
+    const coverageLevel = config.coverageLevel ?? "standard";
+
+    if (useCache) {
+      let sourceHash;
+      try {
+        sourceHash = await computeFileHash(filePath);
+      } catch {
+        // Hash non calculable → on ne peut pas utiliser le cache
+        sourceHash = null;
+      }
+
+      if (sourceHash !== null) {
+        const cached = getCachedGeneration(
+          cache,
+          filePath,
+          sourceHash,
+          coverageLevel,
+        );
+        if (cached) {
+          logger.debug(`Cache hit : ${filePath}`, config.verbose);
+          return cached;
+        }
+
+        // Cache miss → générer
+        const generated =
+          workspace === "backend"
+            ? await generateBackendTest(filePath, config.backend)
+            : await generateFrontendTest(filePath, fileType, config.frontend);
+
+        if (generated) {
+          setCachedGeneration(
+            cache,
+            filePath,
+            sourceHash,
+            coverageLevel,
+            generated,
+          );
+          cacheModified = true;
+        }
+        return generated;
+      }
+    }
+
+    // Cache désactivé ou hash non disponible → génération directe
+    return workspace === "backend"
+      ? await generateBackendTest(filePath, config.backend)
+      : await generateFrontendTest(filePath, fileType, config.frontend);
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
   // BACKEND — Sprint 1 : Use-Cases
   // ════════════════════════════════════════════════════════════════════════════
@@ -289,38 +402,34 @@ export async function generateTests(config) {
 
     logger.info(`${useCaseFiles.length} use-case(s) trouvé(s)`);
 
-    for (const file of useCaseFiles) {
+    const backendResults = await runConcurrent(useCaseFiles, async (file) => {
       logger.debug(`Traitement : ${file.filePath}`, config.verbose);
-
       try {
-        const generated = await generateBackendTest(
-          file.filePath,
-          config.backend,
-        );
+        const generated = await getGenerated(file.filePath, "backend");
 
         if (!generated) {
-          results.push({
+          logger.file(file.testFilePath, "error", "parsing failed");
+          return {
             status: "error",
             testFilePath: file.testFilePath,
             sourceFilePath: file.filePath,
             reason: "parsing failed",
-          });
-          logger.file(file.testFilePath, "error", "parsing failed");
-          continue;
+          };
         }
 
-        const result = await processGenerated(generated, file.filePath, config);
-        results.push(result);
+        return await processGenerated(generated, file.filePath, config);
       } catch (err) {
         logger.error(`${file.filePath} — ${err.message}`);
-        results.push({
+        return {
           status: "error",
           testFilePath: file.testFilePath,
           sourceFilePath: file.filePath,
           reason: err.message,
-        });
+        };
       }
-    }
+    });
+
+    results.push(...backendResults.filter(Boolean));
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -343,39 +452,48 @@ export async function generateTests(config) {
       `${components.length} composant(s) + ${hooks.length} hook(s) trouvés`,
     );
 
-    for (const file of frontendFiles) {
+    const frontendResults = await runConcurrent(frontendFiles, async (file) => {
       logger.debug(`Traitement : ${file.filePath}`, config.verbose);
-
       try {
-        const generated = await generateFrontendTest(
+        const generated = await getGenerated(
           file.filePath,
+          "frontend",
           file.type,
-          config.frontend,
         );
 
         if (!generated) {
-          results.push({
+          logger.file(file.testFilePath, "error", "parsing failed");
+          return {
             status: "error",
             testFilePath: file.testFilePath,
             sourceFilePath: file.filePath,
             reason: "parsing failed",
-          });
-          logger.file(file.testFilePath, "error", "parsing failed");
-          continue;
+          };
         }
 
-        const result = await processGenerated(generated, file.filePath, config);
-        results.push(result);
+        return await processGenerated(generated, file.filePath, config);
       } catch (err) {
         logger.error(`${file.filePath} — ${err.message}`);
-        results.push({
+        return {
           status: "error",
           testFilePath: file.testFilePath,
           sourceFilePath: file.filePath,
           reason: err.message,
-        });
+        };
       }
-    }
+    });
+
+    results.push(...frontendResults.filter(Boolean));
+  }
+
+  // ── Sauvegarde du cache ───────────────────────────────────────────────────
+  if (useCache && cacheModified) {
+    await saveCache(cacheFilePath, cache);
+    const stats = getCacheStats(cache);
+    logger.debug(
+      `Cache sauvegardé : ${stats.total} entrée(s) → ${cacheFilePath}`,
+      config.verbose,
+    );
   }
 
   // ════════════════════════════════════════════════════════════════════════════

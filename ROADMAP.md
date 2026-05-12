@@ -197,30 +197,33 @@ Bootstrapper rapidement 200 stubs = `minimal`. Travailler en TDD strict = `exhau
 
 ---
 
-## 📋 v0.6.0 — Performance & expérience développeur _(planifié)_
+## ✅ v0.6.0 — Performance & expérience développeur
 
-> _Rendre Unitix rapide sur les grands projets et agréable à déboguer._
+> _Unitix rapide sur les grands projets et agréable à déboguer._
 
 ### Optimisations
 
-- [ ] **Parsing AST parallèle** — remplacer la boucle séquentielle `for (const file of files)`
-  par `Promise.all(files.map(...))` dans l'engine. Gain estimé : 3-5× sur >100 fichiers
-- [ ] **Cache de l'AST** — stocker les résultats parsés dans un fichier
-  `.unitix-cache.json` (keyed par hash du fichier source). Évite de re-parser
-  les fichiers inchangés entre deux runs
-- [ ] **Mode `--watch`** — surveiller les fichiers sources avec `fs.watch()` et
-  régénérer automatiquement les stubs quand un fichier est modifié
+- [x] **Parsing AST parallèle** — `runConcurrent()` dans l'engine remplace la boucle
+  séquentielle `for (const file of files)` par un pool de 12 workers concurrents.
+  Gain estimé : 3-5× sur >100 fichiers
+- [x] **Cache de génération** — `.unitix-cache.json` (keyed par hash source + coverageLevel).
+  Évite de re-parser les fichiers inchangés entre deux runs. Module `utils/ast-cache.mjs`
+  + intégration dans l'engine. Flag `--no-cache` pour désactiver
+- [x] **Mode `--watch`** — surveille les fichiers sources avec `fs.watch({ recursive: true })`
+  (disponible sur Windows/macOS, Node 22+ sur Linux) et régénère automatiquement les stubs
+  quand un fichier est modifié (debounce 500ms)
 
 ### Expérience développeur
 
-- [ ] **Meilleurs messages d'erreur** — en cas d'échec de parsing AST, afficher
-  la ligne et le fichier exact avec un extrait de code contextuel
-- [ ] **Flag `--root=<chemin>`** — permettre d'analyser un projet depuis un
-  répertoire différent du CWD (utile en CI ou en monorepo)
-- [ ] **Flag `--json`** — sortie JSON machine-readable de `--detect` et du résumé
-  de génération (pour intégrations CI/scripts)
-- [ ] **Colorisation configurable** — `--no-color` pour les environnements CI
-  qui ne supportent pas ANSI
+- [x] **Meilleurs messages d'erreur** — en cas d'échec de parsing AST, `formatParseError()`
+  affiche le fichier, la ligne:colonne et un extrait de code contextuel avec marqueur `>`.
+  Module `utils/parse-error.mjs` utilisé dans les 4 parsers
+- [x] **Flag `--root=<chemin>`** — analyser un projet depuis un répertoire différent du CWD
+  (utile en CI ou en monorepo). `projectRoot` résolu en début de `bin/unitix`
+- [x] **Flag `--json`** — déjà livré en v0.3.1
+- [x] **Colorisation configurable** — déjà livré en v0.3.1 (`--no-color`)
+
+**Tests** : +52 nouveaux tests unitaires (ast-cache, parse-error, cli flags) — total 121/121.
 
 ---
 
@@ -340,4 +343,4 @@ ne peut pas personnaliser les stubs sans forker le package.
 
 ---
 
-_Dernière mise à jour : v0.5.1_
+_Dernière mise à jour : v0.6.0_

@@ -11,6 +11,8 @@ import { parse } from "@typescript-eslint/typescript-estree";
 import { readFile } from "fs/promises";
 import path from "path";
 
+import { formatParseError } from "../utils/parse-error.mjs";
+
 /** @import { UseCaseInfo, ConstructorParam, ExecuteParam } from '../types.mjs' */
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
@@ -403,9 +405,8 @@ export async function parseUseCase(filePath) {
   try {
     ast = parse(code, { jsx: false, loc: true, range: true });
   } catch (err) {
-    console.warn(
-      `[use-case-parser] Erreur de parsing AST : ${filePath} — ${err.message}`,
-    );
+    const details = formatParseError(err, code, filePath);
+    console.warn(`[use-case-parser] Erreur de parsing AST :\n${details}`);
     return null;
   }
 

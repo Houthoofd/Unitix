@@ -1,6 +1,6 @@
 {
   "name": "@houthoofd/unitix",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Test stub generator for Clean Architecture projects (TypeScript / Jest / Vitest)",
   "type": "module",
   "main": "index.mjs",
@@ -11,7 +11,7 @@
     ".": "./index.mjs"
   },
   "scripts": {
-    "test": "node --test tests/unit/utils/sync-merger.test.mjs tests/unit/templates/backend-use-case.test.mjs tests/unit/templates/frontend-component.test.mjs tests/unit/templates/frontend-hook.test.mjs"
+    "test": "node --test tests/unit/utils/sync-merger.test.mjs tests/unit/utils/ast-cache.test.mjs tests/unit/utils/parse-error.test.mjs tests/unit/core/cli.test.mjs tests/unit/templates/backend-use-case.test.mjs tests/unit/templates/frontend-component.test.mjs tests/unit/templates/frontend-hook.test.mjs"
   },
   "keywords": [
     "test-generator",

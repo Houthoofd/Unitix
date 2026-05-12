@@ -7,9 +7,11 @@
  * @module parsers/hook-parser
  */
 
-import { parse }    from '@typescript-eslint/typescript-estree';
-import { readFile } from 'fs/promises';
-import path         from 'path';
+import { parse } from "@typescript-eslint/typescript-estree";
+import { readFile } from "fs/promises";
+import path from "path";
+
+import { formatParseError } from "../utils/parse-error.mjs";
 
 /** @import { HookInfo } from '../types.mjs' */
 
@@ -25,14 +27,14 @@ import path         from 'path';
  * @returns {string}
  */
 function extractFeature(filePath) {
-  const normalized = filePath.replace(/\\/g, '/');
+  const normalized = filePath.replace(/\\/g, "/");
 
   const featuresMatch = normalized.match(/features\/([^/]+)\//);
   if (featuresMatch) return featuresMatch[1];
 
-  if (normalized.includes('/shared/')) return 'shared';
+  if (normalized.includes("/shared/")) return "shared";
 
-  return 'unknown';
+  return "unknown";
 }
 
 /**
@@ -42,7 +44,7 @@ function extractFeature(filePath) {
  * @returns {boolean}
  */
 function isHookName(name) {
-  return typeof name === 'string' && name.startsWith('use') && name.length > 3;
+  return typeof name === "string" && name.startsWith("use") && name.length > 3;
 }
 
 /**
@@ -59,20 +61,20 @@ function isHookName(name) {
  */
 function extractNamesFromExportNode(node) {
   const hooks = [];
-  const keys  = [];
+  const keys = [];
 
   if (!node.declaration) {
     // Re-exports : export { useFoo } from '...'
     for (const spec of node.specifiers ?? []) {
-      const name = spec.exported?.name ?? '';
+      const name = spec.exported?.name ?? "";
       if (isHookName(name)) hooks.push(name);
     }
     return { hooks, keys };
   }
 
   // export function useFoo() { ... }
-  if (node.declaration.type === 'FunctionDeclaration') {
-    const name = node.declaration.id?.name ?? '';
+  if (node.declaration.type === "FunctionDeclaration") {
+    const name = node.declaration.id?.name ?? "";
     if (name) {
       if (isHookName(name)) {
         hooks.push(name);
@@ -84,16 +86,16 @@ function extractNamesFromExportNode(node) {
   }
 
   // export const useFoo = () => ...  /  export const alertKeys = { ... }
-  if (node.declaration.type === 'VariableDeclaration') {
+  if (node.declaration.type === "VariableDeclaration") {
     for (const decl of node.declaration.declarations ?? []) {
-      const name = decl.id?.name ?? '';
+      const name = decl.id?.name ?? "";
       if (!name) continue;
 
       if (isHookName(name)) {
         // Vérifier que l'init est bien une fonction
         if (
-          decl.init?.type === 'ArrowFunctionExpression' ||
-          decl.init?.type === 'FunctionExpression'
+          decl.init?.type === "ArrowFunctionExpression" ||
+          decl.init?.type === "FunctionExpression"
         ) {
           hooks.push(name);
         }
@@ -126,9 +128,11 @@ export async function parseHook(filePath) {
   // ── Lecture du fichier ─────────────────────────────────────────────────────
   let code;
   try {
-    code = await readFile(filePath, 'utf-8');
+    code = await readFile(filePath, "utf-8");
   } catch (err) {
-    console.warn(`[hook-parser] Impossible de lire le fichier : ${filePath} — ${err.message}`);
+    console.warn(
+      `[hook-parser] Impossible de lire le fichier : ${filePath} — ${err.message}`,
+    );
     return null;
   }
 
@@ -137,16 +141,17 @@ export async function parseHook(filePath) {
   try {
     ast = parse(code, { jsx: false, loc: true, range: true });
   } catch (err) {
-    console.warn(`[hook-parser] Erreur de parsing AST : ${filePath} — ${err.message}`);
+    const details = formatParseError(err, code, filePath);
+    console.warn(`[hook-parser] Erreur de parsing AST :\n${details}`);
     return null;
   }
 
   // ── Collecte des hooks exportés et des query keys ─────────────────────────
-  const hookNames     = [];
+  const hookNames = [];
   const queryKeyNames = [];
 
   for (const node of ast.body) {
-    if (node.type !== 'ExportNamedDeclaration') continue;
+    if (node.type !== "ExportNamedDeclaration") continue;
 
     const { hooks, keys } = extractNamesFromExportNode(node);
 
@@ -166,9 +171,9 @@ export async function parseHook(filePath) {
   }
 
   // ── Extraction des métadonnées ─────────────────────────────────────────────
-  const feature      = extractFeature(filePath);
-  const usesQuery    = code.includes('useQuery');
-  const usesMutation = code.includes('useMutation');
+  const feature = extractFeature(filePath);
+  const usesQuery = code.includes("useQuery");
+  const usesMutation = code.includes("useMutation");
 
   return {
     filePath,

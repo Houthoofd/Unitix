@@ -10,6 +10,8 @@ import { parse } from "@typescript-eslint/typescript-estree";
 import { readFile, access, readdir } from "fs/promises";
 import path from "path";
 
+import { formatParseError } from "../utils/parse-error.mjs";
+
 /** @import { InterfaceInfo, InterfaceMethod } from '../types.mjs' */
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
@@ -234,9 +236,8 @@ export async function parseInterface(filePath) {
   try {
     ast = parse(code, { jsx: false, loc: true, range: true });
   } catch (err) {
-    console.warn(
-      `[interface-parser] Erreur de parsing AST : ${filePath} — ${err.message}`,
-    );
+    const details = formatParseError(err, code, filePath);
+    console.warn(`[interface-parser] Erreur de parsing AST :\n${details}`);
     return null;
   }
 

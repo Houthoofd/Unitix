@@ -21,6 +21,9 @@
  * @property {boolean}                    noColor     - Désactiver les codes ANSI
  * @property {boolean}                    sync        - Resynchroniser les stubs désynchronisés (source modifiée depuis génération)
  * @property {boolean}                    init        - Lancer le wizard de configuration interactif
+ * @property {string|null}                root        - Répertoire racine du projet (défaut: CWD)
+ * @property {boolean}                    watch       - Surveiller les sources et régénérer à la volée
+ * @property {boolean}                    noCache     - Désactiver le cache AST (.unitix-cache.json)
  */
 
 /** @type {Options} */
@@ -40,6 +43,9 @@ const DEFAULTS = {
   noColor: false,
   sync: false,
   init: false,
+  root: null,
+  watch: false,
+  noCache: false,
 };
 
 /**
@@ -119,6 +125,16 @@ export function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--watch") {
+      options.watch = true;
+      continue;
+    }
+
+    if (arg === "--no-cache") {
+      options.noCache = true;
+      continue;
+    }
+
     if (arg === "init") {
       options.init = true;
       continue;
@@ -150,6 +166,10 @@ export function parseArgs(argv) {
 
         case "sprint":
           options.sprint = value;
+          break;
+
+        case "root":
+          options.root = value || null;
           break;
 
         default:
@@ -197,6 +217,9 @@ export function printHelp() {
     "    --ci                                 Mode CI : exit 1 si des stubs manquent",
     "    --json                               Sortie JSON sur stdout (logs sur stderr)",
     "    --no-color                           Désactiver la colorisation ANSI",
+    "    --root=<chemin>                      Racine du projet (défaut: CWD)",
+    "    --watch                              Surveiller les sources, régénérer à chaque changement",
+    "    --no-cache                           Désactiver le cache AST (.unitix-cache.json)",
     "    --help, -h                           Affiche cette aide",
     "",
     "  \x1b[1mExemples :\x1b[0m",
@@ -204,6 +227,8 @@ export function printHelp() {
     "    npx unitix --detect                                   # détecter l'architecture",
     "    npx unitix --auto                                     # détecter + générer",
     "    npx unitix --auto --workspace=backend --dry-run       # prévisualiser backend uniquement",
+    "    npx unitix --auto --watch                             # surveiller et régénérer en continu",
+    "    npx unitix --auto --root=./packages/api               # analyser un sous-dossier",
     "    npx unitix --workspace=backend --sprint=1             # avec config manuelle",
     "    npx unitix --module=alerts --dry-run                  # cibler un module",
     "",
